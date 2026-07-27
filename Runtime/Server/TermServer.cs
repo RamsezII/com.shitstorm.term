@@ -14,26 +14,19 @@ namespace _TERM_
     public partial class TermServer : MonoBehaviour
     {
         [Header("TCP Server")]
-        [SerializeField] private string address = "127.0.0.1";
-        [SerializeField, Min(1)] private int port = 5050;
-        [SerializeField] private bool startOnEnable = true;
+        [SerializeField] string address = "127.0.0.1";
+        [SerializeField, Min(1)] int port = 5050;
+
+        TcpListener listener;
+        TcpClient activeClient;
+        CancellationTokenSource cancellation;
+        Task listenerTask;
 
         //----------------------------------------------------------------------------------------------------------
 
-        private TcpListener listener;
-        private TcpClient activeClient;
-        private CancellationTokenSource cancellation;
-        private Task listenerTask;
-
-        private void OnEnable()
+        private void Start()
         {
-            if (startOnEnable)
-                StartServer();
-        }
-
-        private void OnDisable()
-        {
-            StopServer();
+            StartServer();
         }
 
         private void OnDestroy()
@@ -41,8 +34,8 @@ namespace _TERM_
             StopServer();
         }
 
-        [ContextMenu("Start server")]
-        public void StartServer()
+        [ContextMenu(nameof(StartServer))]
+        void StartServer()
         {
             if (listener != null)
                 return;
@@ -68,8 +61,8 @@ namespace _TERM_
             }
         }
 
-        [ContextMenu("Stop server")]
-        public void StopServer()
+        [ContextMenu(nameof(StopServer))]
+        void StopServer()
         {
             CancellationTokenSource currentCancellation = cancellation;
             TcpListener currentListener = listener;
@@ -86,7 +79,7 @@ namespace _TERM_
             currentCancellation?.Dispose();
         }
 
-        private async Task AcceptClientsAsync(TcpListener activeListener, CancellationToken token)
+        async Task AcceptClientsAsync(TcpListener activeListener, CancellationToken token)
         {
             try
             {
@@ -110,7 +103,7 @@ namespace _TERM_
             }
         }
 
-        private async Task HandleClientAsync(TcpClient client, CancellationToken token)
+        async Task HandleClientAsync(TcpClient client, CancellationToken token)
         {
             try
             {
@@ -170,12 +163,12 @@ namespace _TERM_
             }
         }
 
-        private static Task SendAsync(StreamWriter writer, ServerMessage message)
+        static Task SendAsync(StreamWriter writer, ServerMessage message)
         {
             return writer.WriteLineAsync(JsonUtility.ToJson(message));
         }
 
-        private static ServerMessage ExecuteCommand(string input)
+        static ServerMessage ExecuteCommand(string input)
         {
             string commandLine = input.Trim();
             if (commandLine.Length == 0)
