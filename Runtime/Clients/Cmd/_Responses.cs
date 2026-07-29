@@ -64,17 +64,17 @@ namespace _TERM_
             }
         }
 
-        internal sealed class CmdResponse_completion : CmdResponse
+        internal sealed class CmdResponse_completions : CmdResponse
         {
             public int start, end;
             public IList<string> candidates;
 
             //----------------------------------------------------------------------------------------------------------
 
-            internal CmdResponse_completion(in Range range, in IList<string> candidates) : base(RespTypes.completion)
+            internal CmdResponse_completions(in int start, in int end, in IList<string> candidates) : base(RespTypes.completion)
             {
-                start = range.Start.Value;
-                end = range.End.Value;
+                this.start = start;
+                this.end = end;
                 this.candidates = candidates;
             }
         }

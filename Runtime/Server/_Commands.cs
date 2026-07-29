@@ -37,16 +37,31 @@ namespace _TERM_
                 error = $"Unknown type '{(string)_type}'";
             else
             {
-                CmdLineReader reader = new(
+                CmdReader reader = new(
+                    type: type,
                     line: (string)jrequest["cmdline"],
                     cursor: jrequest.TryGetValue("cursor", out var _cursor) ? (int)_cursor : 0
                 );
 
-                var routine = root_commands.HandleRequest(connection, type, reader);
-                while (routine.MoveNext())
-                    yield return null;
+                var routine = root_commands.HandleRequest(connection, reader);
+                if (routine != null)
+                    while (routine.MoveNext())
+                        yield return null;
 
                 error ??= reader.GetError;
+
+                if (error == null)
+                    if (type == CmdTypes.Complete)
+                        if (reader.compl_candidates.Count > 0)
+                        {
+                            var esend = connection.ESend(new CmdClient.CmdResponse_completions(
+                                start: reader.compl_start,
+                                end: reader.compl_end,
+                                candidates: reader.compl_candidates
+                            ));
+                            while (esend.MoveNext())
+                                yield return null;
+                        }
             }
 
             if (error != null)

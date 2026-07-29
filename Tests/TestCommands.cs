@@ -10,30 +10,31 @@ namespace _TERM_.Tests
         {
             TermServer.root_commands.AddCommandNode(new CmdCommand(
                 name: "echo",
-                args: static (reader, args) =>
+                args: static (reader, handler) =>
                 {
-                    if (!reader.TryRead(out string output))
-                        output = string.Empty;
-                    args.Add(output);
+                    if (reader.TryRead(out string output))
+                        handler.args.Add(output);
+                    else
+                        reader.WriteError($"expected argument");
                 },
-                action1: static (opts, args) =>
+                action1: static handler =>
                 {
-                    return (string)args[0];
+                    return (string)handler.args[0];
                 }
             ));
 
             TermServer.root_commands.AddCommandNode(new CmdCommand(
                 name: "wait_seconds",
-                args: static (reader, args) =>
+                args: static (reader, handler) =>
                 {
                     if (reader.TryRead(out string output) && float.TryParse(output, out float seconds))
-                        args.Add(seconds);
+                        handler.args.Add(seconds);
                     else
-                        args.Add(0);
+                        handler.args.Add(0);
                 },
-                routine2: static (opts, args) =>
+                routine2: static handler =>
                 {
-                    float seconds = (float)args[0];
+                    float seconds = (float)handler.args[0];
                     return EWait(seconds);
                     static IEnumerator<CmdCommand.RoutineStatus> EWait(float seconds)
                     {
@@ -49,7 +50,7 @@ namespace _TERM_.Tests
 
             TermServer.root_commands.AddCommandNode(new CmdCommand(
                 name: "wait_1second",
-                routine2: static (opts, args) =>
+                routine2: static handler =>
                 {
                     return EWait();
                     static IEnumerator<CmdCommand.RoutineStatus> EWait()
@@ -70,14 +71,14 @@ namespace _TERM_.Tests
             ns.AddCommandNode(ns = new("ns3"));
             ns.AddCommandNode(new CmdCommand(
                 name: "test",
-                args: static (reader, args) =>
+                args: static (reader, handler) =>
                 {
                     reader.TryRead(out string output);
-                    args.Add(output);
+                    handler.args.Add(output);
                 },
-                action1: static (opts, args) =>
+                action1: static handler =>
                 {
-                    return (string)args[0];
+                    return (string)handler.args[0];
                 }
             ));
         }

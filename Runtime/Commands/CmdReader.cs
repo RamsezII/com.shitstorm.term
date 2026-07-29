@@ -1,4 +1,4 @@
-﻿using System;
+﻿using System.Collections.Generic;
 using System.Text;
 
 namespace _TERM_
@@ -10,28 +10,41 @@ namespace _TERM_
         Execute,
     }
 
-    public struct CmdLineReader
+    public struct CmdReader
     {
+        internal CmdTypes type;
         public readonly string line;
         public readonly int cursor;
         public int start_i, read_i;
+        public int compl_start, compl_end;
+        public readonly List<string> compl_candidates;
         readonly StringBuilder error_sb;
-        public readonly string GetError => error_sb != null && error_sb.Length > 0 ? error_sb.ToString() : null;
+        public readonly bool HasError => error_sb != null && error_sb.Length > 0;
+        public readonly string GetError => HasError ? error_sb.ToString() : null;
 
         //----------------------------------------------------------------------------------------------------------
 
-        public CmdLineReader(in string line, in int cursor = 0)
+        public CmdReader(in CmdTypes type, in string line, in int cursor = 0)
         {
+            this.type = type;
             this.line = line;
-            this.cursor = cursor;
+
             start_i = 0;
             read_i = 0;
+            compl_start = 0;
+            compl_end = line.Length;
+            compl_candidates = new List<string>();
             error_sb = new();
+
+            this.cursor = type switch
+            {
+                CmdTypes.Check or CmdTypes.Execute => line.Length,
+                _ => cursor,
+            };
         }
 
         //----------------------------------------------------------------------------------------------------------
 
-        public readonly void AddError(in string error) => error_sb.AppendLine(error);
         public readonly void WriteError(in string error, in bool force = false)
         {
             if (error_sb.Length == 0)
@@ -61,7 +74,7 @@ namespace _TERM_
         {
             SkipEmpties();
 
-            if (read_i < line.Length)
+            if (read_i < cursor)
             {
                 start_i = read_i;
                 SkipNoneEmpties();
@@ -78,25 +91,15 @@ namespace _TERM_
             return false;
         }
 
-        public readonly bool HasNext() => HasNext(out _);
-        public readonly bool HasNext(out int next_i)
+        public bool IsOnCompletion()
         {
-            next_i = read_i;
-            while (next_i < line.Length && line[next_i] == ' ')
-                ++next_i;
-            return next_i < line.Length;
-        }
-
-        public readonly bool IsOnCompletion(out Range range)
-        {
-            range = new(0, line.Length);
-
-            if (start_i <= cursor && cursor <= read_i)
-            {
-                range = new(start_i, read_i);
-                return true;
-            }
-
+            if (type == CmdTypes.Complete)
+                if (start_i <= cursor && cursor <= read_i)
+                {
+                    compl_start = start_i;
+                    compl_end = read_i;
+                    return true;
+                }
             return false;
         }
     }

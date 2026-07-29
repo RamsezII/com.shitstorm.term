@@ -18,7 +18,7 @@ namespace _TERM_
 
         //----------------------------------------------------------------------------------------------------------
 
-        internal abstract IEnumerator HandleRequest(CmdClient connection, CmdTypes type, CmdLineReader reader);
+        internal abstract IEnumerator HandleRequest(CmdClient connection, CmdReader reader);
     }
 
     public sealed class CmdNamespace : CmdNode
@@ -40,22 +40,22 @@ namespace _TERM_
 
         //----------------------------------------------------------------------------------------------------------
 
-        internal override IEnumerator HandleRequest(CmdClient connection, CmdTypes type, CmdLineReader reader)
+        internal override IEnumerator HandleRequest(CmdClient connection, CmdReader reader)
         {
             bool read_b = reader.TryRead(out string read);
 
-            if (reader.IsOnCompletion(out var range))
+            if (reader.IsOnCompletion())
             {
-                string[] candidates = cmd_nodes.Keys.ToArray();
-                Array.Sort(candidates);
-                return connection.ESend(new CmdClient.CmdResponse_completion(range, candidates));
+                reader.compl_candidates.AddRange(cmd_nodes.Keys);
+                reader.compl_candidates.Sort();
+                return null;
             }
             else if (!read_b)
                 reader.WriteError($"expected command or namespace name (in namespace '{name}')");
             else if (!cmd_nodes.TryGetValue(read, out var node))
                 reader.WriteError($"no command or namespace called '{read}' in namespace '{name}'");
             else
-                return node.HandleRequest(connection, type, reader);
+                return node.HandleRequest(connection, reader);
 
             return null;
         }
@@ -87,82 +87,73 @@ namespace _TERM_
             }
         }
 
-        public class Opts : Dictionary<string, object>
+        public sealed class CmdHandler
         {
-            public Opts() : base(StringComparer.Ordinal)
-            {
-            }
+            public readonly List<object> args = new();
+            public readonly Dictionary<string, object> options = new(StringComparer.Ordinal);
         }
 
-        public class Args : List<object>
-        {
-        }
-
-        public readonly Action<CmdLineReader, Opts> opts;
-        public readonly Action<CmdLineReader, Args> args;
-        public readonly Func<Opts, Args, string> action1;
-        public readonly Func<Opts, Args, IEnumerator<RoutineStatus>> routine2;
+        public readonly Action<CmdReader, CmdHandler> arguments;
+        public readonly Func<CmdHandler, string> action1;
+        public readonly Func<CmdHandler, IEnumerator<RoutineStatus>> routine2;
 
         //----------------------------------------------------------------------------------------------------------
 
         public CmdCommand(
             in string name,
-            in Action<CmdLineReader, Opts> opts = null,
-            in Action<CmdLineReader, Args> args = null,
-            in Func<Opts, Args, string> action1 = null,
-            in Func<Opts, Args, IEnumerator<RoutineStatus>> routine2 = null
+            in Action<CmdReader, CmdHandler> args = null,
+            in Func<CmdHandler, string> action1 = null,
+            in Func<CmdHandler, IEnumerator<RoutineStatus>> routine2 = null
         ) : base(name)
         {
-            this.opts = opts;
-            this.args = args;
+            this.arguments = args;
             this.action1 = action1;
             this.routine2 = routine2;
         }
 
         //----------------------------------------------------------------------------------------------------------
 
-        internal override IEnumerator HandleRequest(CmdClient connection, CmdTypes type, CmdLineReader reader)
+        internal override IEnumerator HandleRequest(CmdClient connection, CmdReader reader)
         {
-            Opts opts = new();
-            this.opts?.Invoke(reader, opts);
+            CmdHandler handler = new();
 
-            Args args = new();
-            this.args?.Invoke(reader, args);
+            arguments?.Invoke(reader, handler);
 
-            if (type == CmdTypes.Execute)
-            {
-                if (action1 != null)
+            if (!reader.HasError)
+                if (reader.type == CmdTypes.Execute)
                 {
-                    string result = action1(opts, args);
-                    var esend = connection.ESend(new CmdClient.CmdResponse_result(result));
-                    while (esend.MoveNext())
-                        yield return null;
-                }
-
-                if (routine2 != null)
-                {
-                    using var routine = routine2(opts, args);
-                    RoutineStatus last_status = default;
-
-                    while (routine.MoveNext())
+                    if (action1 != null)
                     {
-                        last_status = routine.Current;
-
-                        if (last_status.assigned)
-                        {
-                            var estatus = connection.ESend(new CmdClient.CmdResponse_status(last_status));
-                            while (estatus.MoveNext())
-                                yield return null;
-                        }
-                        else
+                        string result = action1(handler);
+                        var esend = connection.ESend(new CmdClient.CmdResponse_result(result));
+                        while (esend.MoveNext())
                             yield return null;
                     }
 
-                    var eresult = connection.ESend(new CmdClient.CmdResponse_result(last_status.assigned ? last_status.result : null));
-                    while (eresult.MoveNext())
-                        yield return null;
+                    if (routine2 != null)
+                    {
+                        using var routine = routine2(handler);
+                        RoutineStatus last_status = default;
+
+                        while (routine.MoveNext())
+                        {
+                            last_status = routine.Current;
+
+                            if (last_status.assigned)
+                            {
+                                var estatus = connection.ESend(new CmdClient.CmdResponse_status(last_status));
+                                while (estatus.MoveNext())
+                                    yield return null;
+                            }
+                            else
+                                yield return null;
+                        }
+
+                        var eresult = connection.ESend(new CmdClient.CmdResponse_result(last_status.assigned ? last_status.result : null));
+                        while (eresult.MoveNext())
+                            yield return null;
+                    }
                 }
-            }
         }
     }
 }
