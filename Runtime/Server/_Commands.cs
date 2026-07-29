@@ -39,11 +39,10 @@ namespace _TERM_
             {
                 CmdLineReader reader = new(
                     line: (string)jrequest["cmdline"],
-                    type: type,
                     cursor: jrequest.TryGetValue("cursor", out var _cursor) ? (int)_cursor : 0
                 );
 
-                var routine = root_commands.HandleRequest(connection, reader);
+                var routine = root_commands.HandleRequest(connection, type, reader);
                 while (routine.MoveNext())
                     yield return null;
 

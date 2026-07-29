@@ -13,23 +13,16 @@ namespace _TERM_
     public struct CmdLineReader
     {
         public readonly string line;
-        public readonly CmdTypes type;
         public readonly int cursor;
         public int start_i, read_i;
         readonly StringBuilder error_sb;
         public readonly string GetError => error_sb != null && error_sb.Length > 0 ? error_sb.ToString() : null;
-        public readonly bool IsCompletionType => type switch
-        {
-            CmdTypes.Complete => true,
-            _ => false,
-        };
 
         //----------------------------------------------------------------------------------------------------------
 
-        public CmdLineReader(in string line, in CmdTypes type, in int cursor = 0)
+        public CmdLineReader(in string line, in int cursor = 0)
         {
             this.line = line;
-            this.type = type;
             this.cursor = cursor;
             start_i = 0;
             read_i = 0;
@@ -50,13 +43,15 @@ namespace _TERM_
             }
         }
 
-        public void SkipEmpties()
+        public void SkipEmpties() => SkipEmpties(ref read_i);
+        public readonly void SkipEmpties(ref int read_i)
         {
             while (read_i < line.Length && line[read_i] == ' ')
                 ++read_i;
         }
 
-        public void SkipNoneEmpties()
+        public void SkipNoneEmpties() => SkipNoneEmpties(ref read_i);
+        public readonly void SkipNoneEmpties(ref int read_i)
         {
             while (read_i < line.Length && line[read_i] != ' ')
                 ++read_i;
@@ -68,12 +63,12 @@ namespace _TERM_
 
             if (read_i < line.Length)
             {
-                int old_read_i = read_i;
+                start_i = read_i;
                 SkipNoneEmpties();
 
-                if (read_i > old_read_i)
+                if (read_i > start_i)
                 {
-                    output = line[old_read_i..read_i];
+                    output = line[start_i..read_i];
                     SkipEmpties();
                     return true;
                 }
@@ -83,20 +78,22 @@ namespace _TERM_
             return false;
         }
 
-        public readonly bool HasNext()
+        public readonly bool HasNext() => HasNext(out _);
+        public readonly bool HasNext(out int next_i)
         {
-            int read_i = this.read_i;
-            while (read_i < line.Length && line[read_i] == ' ')
-                ++read_i;
-            return read_i < line.Length;
+            next_i = read_i;
+            while (next_i < line.Length && line[next_i] == ' ')
+                ++next_i;
+            return next_i < line.Length;
         }
 
         public readonly bool IsOnCompletion(out Range range)
         {
             range = new(0, line.Length);
 
-            if (IsCompletionType)
+            if (start_i <= cursor && cursor <= read_i)
             {
+                range = new(start_i, read_i);
                 return true;
             }
 
