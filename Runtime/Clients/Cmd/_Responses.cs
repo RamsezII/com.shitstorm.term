@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace _TERM_
 {
@@ -11,7 +10,7 @@ namespace _TERM_
             error,
             exception,
             completion,
-            end,
+            result,
         }
 
         internal abstract class CmdResponse : TermResponse
@@ -53,13 +52,16 @@ namespace _TERM_
 
         internal sealed class CmdResponse_completion : CmdResponse
         {
-            public string[] candidates;
+            public int start, end;
+            public IList<string> candidates;
 
             //----------------------------------------------------------------------------------------------------------
 
-            internal CmdResponse_completion(in IList<string> candidates) : base(RespTypes.completion)
+            internal CmdResponse_completion(in Range range, in IList<string> candidates) : base(RespTypes.completion)
             {
-                this.candidates = candidates.ToArray();
+                start = range.Start.Value;
+                end = range.End.Value;
+                this.candidates = candidates;
             }
         }
 
@@ -70,7 +72,7 @@ namespace _TERM_
 
             //----------------------------------------------------------------------------------------------------------
 
-            internal CmdResponse_status(in CmdCommand.RoutineStatus status) : base(RespTypes.end)
+            internal CmdResponse_status(in CmdCommand.RoutineStatus status) : base(RespTypes.result)
             {
                 progress = status.progress;
                 prompt = status.prompt;
@@ -83,7 +85,7 @@ namespace _TERM_
 
             //----------------------------------------------------------------------------------------------------------
 
-            internal CmdResponse_end(in string result) : base(RespTypes.end)
+            internal CmdResponse_end(in string result) : base(RespTypes.result)
             {
                 this.result = result;
             }

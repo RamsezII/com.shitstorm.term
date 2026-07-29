@@ -35,6 +35,7 @@ namespace _TERM_
                                 string json = await connection.reader.ReadLineAsync();
                                 if (json == null)
                                     break;
+
                                 lock (routines)
                                     routines.Add(EOnIncomingCommand(connection, json));
                             }

@@ -4,23 +4,23 @@ namespace _TERM_
 {
     partial class LogClient
     {
-        internal enum RespTypes : byte
+        internal enum LogTypes : byte
         {
-            Error,
-            Assert,
-            Warning,
-            Log,
-            Exception,
+            error,
+            assert,
+            warning,
+            log,
+            exception,
         }
 
         internal class LogResponse : TermResponse
         {
-            public RespTypes type;
+            public LogTypes type;
             public string message;
 
             //----------------------------------------------------------------------------------------------------------
 
-            internal LogResponse(in RespTypes type, in string message)
+            internal LogResponse(in LogTypes type, in string message)
             {
                 this.type = type;
                 this.message = message;
@@ -33,9 +33,13 @@ namespace _TERM_
 
             //----------------------------------------------------------------------------------------------------------
 
-            internal LogResponse_exception(in Exception e) : base(RespTypes.exception, e.Message.Trim('\n', '\r'))
+            internal LogResponse_exception(in Exception e) : this(e.Message.Trim('\n', '\r'), e.StackTrace.Trim('\n', '\r'))
             {
-                stacktrace = e.StackTrace.Trim('\n', '\r');
+            }
+
+            internal LogResponse_exception(in string message, in string stacktrace) : base(LogTypes.exception, message.Trim('\n', '\r'))
+            {
+                this.stacktrace = stacktrace.Trim('\n', '\r');
             }
         }
     }

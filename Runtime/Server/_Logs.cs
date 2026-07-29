@@ -14,7 +14,10 @@ namespace _TERM_
         {
             lock (log_connections)
                 foreach (var conn in log_connections)
-                    _ = conn.ASend(new LogClient.LogResponse((LogClient.RespTypes)logType, message));
+                    if (logType == LogType.Exception)
+                        _ = conn.ASend(new LogClient.LogResponse_exception(message, stackTrace));
+                    else
+                        _ = conn.ASend(new LogClient.LogResponse((LogClient.LogTypes)logType, message));
         }
 
         //----------------------------------------------------------------------------------------------------------
@@ -35,7 +38,7 @@ namespace _TERM_
                     _ = WatchLogConnectionAsync(connection, token);
 
                     await connection.ASend(new LogClient.LogResponse(
-                        type: LogClient.RespTypes.Log,
+                        type: LogClient.LogTypes.log,
                         message: "Unity log stream connected."
                     ));
                 }

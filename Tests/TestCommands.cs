@@ -9,9 +9,10 @@ namespace _TERM_.Tests
         {
             TermServer.root_commands.AddCommandNode(new CmdCommand(
                 name: "echo",
-                action: static reader =>
+                action1: static reader =>
                 {
-                    reader.TryRead(out string output);
+                    if (!reader.TryRead(out string output))
+                        output = string.Empty;
                     return output;
                 }
             ));

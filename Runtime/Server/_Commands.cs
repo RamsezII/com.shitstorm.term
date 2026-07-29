@@ -32,12 +32,12 @@ namespace _TERM_
             string error = null;
 
             if (!jrequest.TryGetValue("type", StringComparison.OrdinalIgnoreCase, out var _type))
-                error = "no type specified";
+                error = $"no {typeof(CmdTypes).FullName} specified";
             else if (!Enum.TryParse((string)_type, true, out CmdTypes type))
                 error = $"Unknown type '{(string)_type}'";
             else
             {
-                CmdReader reader = new(
+                CmdLineReader reader = new(
                     line: (string)jrequest["cmdline"],
                     type: type,
                     cursor: jrequest.TryGetValue("cursor", out var _cursor) ? (int)_cursor : 0
@@ -46,11 +46,13 @@ namespace _TERM_
                 var routine = root_commands.HandleRequest(connection, reader);
                 while (routine.MoveNext())
                     yield return null;
+
+                error ??= reader.GetError;
             }
 
             if (error != null)
             {
-                var esend = connection.ESend(new CmdClient.CmdResponse_error($"no {typeof(CmdTypes).FullName} specified"));
+                var esend = connection.ESend(new CmdClient.CmdResponse_error(error));
                 while (esend.MoveNext())
                     yield return null;
             }
