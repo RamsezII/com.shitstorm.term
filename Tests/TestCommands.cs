@@ -65,6 +65,25 @@ namespace _TERM_.Tests
                 }
             ));
 
+            TermServer.root_commands.AddCommandNode(new CmdCommand(
+                name: "prompt_test",
+                routine2: static (handler, hreader) =>
+                {
+                    return EPromptTest(hreader);
+
+                    static IEnumerator<CmdCommand.RoutineStatus> EPromptTest(CmdCommand.ReadHandler hreader)
+                    {
+                        yield return new(prompt: "Ton nom", progress: 0, result: null);
+                        string name = hreader.reader.line.Trim();
+
+                        yield return new(prompt: "Ta couleur préférée", progress: 0.5f, result: null);
+                        string color = hreader.reader.line.Trim();
+
+                        yield return new(prompt: null, progress: 1, result: $"Salut {name}, ta couleur préférée est {color}.");
+                    }
+                }
+            ));
+
             CmdNamespace ns = null;
             TermServer.root_commands.AddCommandNode(ns = new("ns1"));
             ns.AddCommandNode(ns = new("ns2"));

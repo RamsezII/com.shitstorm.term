@@ -1,5 +1,3 @@
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -26,21 +24,18 @@ namespace _TERM_
                     }
         }
 
-        static IEnumerator EOnIncomingCommand(CmdClient connection, string rawtext)
+        static IEnumerator EOnIncomingCommand(CmdClient connection, CmdClient.CmdRequest request)
         {
-            JObject jrequest = JsonConvert.DeserializeObject<JObject>(rawtext);
             string error = null;
 
-            if (!jrequest.TryGetValue("type", StringComparison.OrdinalIgnoreCase, out var _type))
-                error = $"no {typeof(CmdTypes).FullName} specified";
-            else if (!Enum.TryParse((string)_type, true, out CmdTypes type))
-                error = $"Unknown type '{(string)_type}'";
+            if (!Enum.TryParse(request.type, true, out CmdTypes type))
+                error = $"Unknown type '{request.type}'";
             else
             {
                 CmdReader reader = new(
                     type: type,
-                    line: (string)jrequest["cmdline"],
-                    cursor: jrequest.TryGetValue("cursor", out var _cursor) ? (int)_cursor : 0
+                    line: request.cmdline,
+                    cursor: request.cursor
                 );
 
                 var routine = root_commands.HandleRequest(connection, reader);
@@ -50,18 +45,16 @@ namespace _TERM_
 
                 error ??= reader.GetError;
 
-                if (error == null)
-                    if (type == CmdTypes.Complete)
-                        if (reader.compl_candidates.Count > 0)
-                        {
-                            var esend = connection.ESend(new CmdClient.CmdResponse_completions(
-                                start: reader.compl_start,
-                                end: reader.compl_end,
-                                candidates: reader.compl_candidates
-                            ));
-                            while (esend.MoveNext())
-                                yield return null;
-                        }
+                if (error == null && type == CmdTypes.Complete)
+                {
+                    var esend = connection.ESend(new CmdClient.CmdResponse_completions(
+                        start: reader.compl_start,
+                        end: reader.compl_end,
+                        candidates: reader.compl_candidates
+                    ));
+                    while (esend.MoveNext())
+                        yield return null;
+                }
             }
 
             if (error != null)

@@ -56,8 +56,18 @@ namespace _TERM_
                     if (rawtext == null)
                         break;
 
+                    if (!CmdClient.CmdRequest.TryDeserialize(rawtext, out var request, out string error))
+                    {
+                        connection.ClosePromptInput();
+                        await connection.ASend(new CmdClient.CmdResponse_error(error));
+                        continue;
+                    }
+
+                    if (connection.TryDeliverPromptInput(request))
+                        continue;
+
                     lock (routines)
-                        routines.Add(EOnIncomingCommand(connection, rawtext));
+                        routines.Add(EOnIncomingCommand(connection, request));
                 }
             }
             catch (Exception exception) when (
@@ -74,6 +84,8 @@ namespace _TERM_
             }
             finally
             {
+                connection.ClosePromptInput();
+
                 lock (cmd_connections)
                     cmd_connections.Remove(connection);
 

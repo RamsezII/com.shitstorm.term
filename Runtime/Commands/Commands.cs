@@ -1,6 +1,4 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -110,12 +108,7 @@ namespace _TERM_
 
         //----------------------------------------------------------------------------------------------------------
 
-        public CmdCommand(
-            in string name,
-            in Action<CmdReader, CmdHandler> args = null,
-            in Func<CmdHandler, string> action1 = null,
-            in Func<CmdHandler, ReadHandler, IEnumerator<RoutineStatus>> routine2 = null
-        ) : base(name)
+        public CmdCommand(in string name, in Action<CmdReader, CmdHandler> args = null, in Func<CmdHandler, string> action1 = null, in Func<CmdHandler, ReadHandler, IEnumerator<RoutineStatus>> routine2 = null) : base(name)
         {
             this.arguments = args;
             this.action1 = action1;
@@ -145,44 +138,52 @@ namespace _TERM_
                     {
                         ReadHandler hreader = new(reader);
                         using var routine = routine2(handler, hreader);
+                        RoutineStatus last_status = default;
+                        bool interrupted = false;
 
                         while (routine.MoveNext())
-                            if (routine.Current.prompt != null)
+                        {
+                            last_status = routine.Current;
+
+                            if (last_status.prompt != null)
                             {
-                                var estatus = connection.ESend(new CmdClient.CmdResponse_prompt(routine.Current.prompt));
+                                var input_task = connection.WaitForPromptInputAsync();
+                                var estatus = connection.ESend(new CmdClient.CmdResponse_prompt(last_status.prompt));
                                 while (estatus.MoveNext())
                                     yield return null;
 
-                                var task = connection.reader.ReadLineAsync();
-                                while (!task.IsCompleted)
+                                while (!input_task.IsCompleted)
                                     yield return null;
 
-                                string rawtext = task.Result;
-                                if (rawtext == null)
-                                    break;
-
-                                JObject jrequest = JsonConvert.DeserializeObject<JObject>(rawtext);
-                                string error = null;
-
-                                if (!jrequest.TryGetValue("type", StringComparison.OrdinalIgnoreCase, out var _type))
-                                    error = $"no {typeof(CmdTypes).FullName} specified";
-                                else if (!Enum.TryParse((string)_type, true, out CmdTypes type))
-                                    error = $"Unknown type '{(string)_type}'";
-                                else
+                                CmdClient.CmdRequest input = input_task.Result;
+                                if (input == null)
                                 {
-                                    hreader.reader = new(
-                                        type: type,
-                                        line: (string)jrequest["cmdline"],
-                                        cursor: jrequest.TryGetValue("cursor", out var _cursor) ? (int)_cursor : 0
-                                    );
+                                    interrupted = true;
+                                    break;
                                 }
+
+                                if (!string.Equals(input.type, "input", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    var eerror = connection.ESend(new CmdClient.CmdResponse_error($"Expected prompt input, received '{input.type}'."));
+                                    while (eerror.MoveNext())
+                                        yield return null;
+
+                                    interrupted = true;
+                                    break;
+                                }
+
+                                hreader.reader = new(type: CmdTypes.Execute, line: input.cmdline);
                             }
                             else
                                 yield return null;
+                        }
 
-                        var eresult = connection.ESend(new CmdClient.CmdResponse_result(routine.Current.result));
-                        while (eresult.MoveNext())
-                            yield return null;
+                        if (!interrupted)
+                        {
+                            var eresult = connection.ESend(new CmdClient.CmdResponse_result(last_status.result));
+                            while (eresult.MoveNext())
+                                yield return null;
+                        }
                     }
                 }
         }
