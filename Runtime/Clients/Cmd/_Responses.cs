@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using UnityEngine;
 
 namespace _TERM_
 {
@@ -93,13 +92,13 @@ namespace _TERM_
             }
         }
 
-        internal sealed class CmdResponse_end : CmdResponse
+        internal sealed class CmdResponse_result : CmdResponse
         {
             public string result;
 
             //----------------------------------------------------------------------------------------------------------
 
-            internal CmdResponse_end(in string result) : base(RespTypes.result)
+            internal CmdResponse_result(in string result) : base(RespTypes.result)
             {
                 this.result = result;
             }

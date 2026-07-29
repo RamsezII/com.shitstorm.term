@@ -112,7 +112,7 @@ namespace _TERM_
             if (action1 != null)
             {
                 string result = action1(reader);
-                var esend = connection.ESend(new CmdClient.CmdResponse_end(result));
+                var esend = connection.ESend(new CmdClient.CmdResponse_result(result));
                 while (esend.MoveNext())
                     yield return null;
             }
@@ -124,19 +124,16 @@ namespace _TERM_
                 while (routine.MoveNext())
                     if (routine.Current.assigned)
                     {
-                        var esend = connection.ESend(new CmdClient.CmdResponse_status(routine.Current));
-                        while (esend.MoveNext())
+                        var estatus = connection.ESend(new CmdClient.CmdResponse_status(routine.Current));
+                        while (estatus.MoveNext())
                             yield return null;
                     }
                     else
                         yield return null;
 
-                if (routine.Current.assigned)
-                {
-                    var esend = connection.ESend(new CmdClient.CmdResponse_end(routine.Current.result));
-                    while (esend.MoveNext())
-                        yield return null;
-                }
+                var eresult = connection.ESend(new CmdClient.CmdResponse_result(routine.Current.result));
+                while (eresult.MoveNext())
+                    yield return null;
             }
         }
     }
