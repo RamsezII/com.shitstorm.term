@@ -52,12 +52,12 @@ namespace _TERM_
 
                 while (!token.IsCancellationRequested)
                 {
-                    string json = await connection.reader.ReadLineAsync();
-                    if (json == null)
+                    string rawtext = await connection.reader.ReadLineAsync();
+                    if (rawtext == null)
                         break;
 
                     lock (routines)
-                        routines.Add(EOnIncomingCommand(connection, json));
+                        routines.Add(EOnIncomingCommand(connection, rawtext));
                 }
             }
             catch (Exception exception) when (

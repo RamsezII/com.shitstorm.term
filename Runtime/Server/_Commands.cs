@@ -26,9 +26,9 @@ namespace _TERM_
                     }
         }
 
-        static IEnumerator EOnIncomingCommand(CmdClient connection, string json)
+        static IEnumerator EOnIncomingCommand(CmdClient connection, string rawtext)
         {
-            JObject jrequest = JsonConvert.DeserializeObject<JObject>(json);
+            JObject jrequest = JsonConvert.DeserializeObject<JObject>(rawtext);
             string error = null;
 
             if (!jrequest.TryGetValue("type", StringComparison.OrdinalIgnoreCase, out var _type))

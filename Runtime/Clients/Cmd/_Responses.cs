@@ -79,17 +79,15 @@ namespace _TERM_
             }
         }
 
-        internal sealed class CmdResponse_status : CmdResponse
+        internal sealed class CmdResponse_prompt : CmdResponse
         {
-            public float progress;
             public string prompt;
 
             //----------------------------------------------------------------------------------------------------------
 
-            internal CmdResponse_status(in CmdCommand.RoutineStatus status) : base(RespTypes.status)
+            internal CmdResponse_prompt(in string prompt) : base(RespTypes.status)
             {
-                progress = status.progress;
-                prompt = status.prompt;
+                this.prompt = prompt;
             }
         }
 

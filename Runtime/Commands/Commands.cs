@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -93,9 +95,18 @@ namespace _TERM_
             public readonly Dictionary<string, object> options = new(StringComparer.Ordinal);
         }
 
+        public sealed class ReadHandler
+        {
+            public CmdReader reader;
+            public ReadHandler(in CmdReader reader)
+            {
+                this.reader = reader;
+            }
+        }
+
         public readonly Action<CmdReader, CmdHandler> arguments;
         public readonly Func<CmdHandler, string> action1;
-        public readonly Func<CmdHandler, IEnumerator<RoutineStatus>> routine2;
+        public readonly Func<CmdHandler, ReadHandler, IEnumerator<RoutineStatus>> routine2;
 
         //----------------------------------------------------------------------------------------------------------
 
@@ -103,7 +114,7 @@ namespace _TERM_
             in string name,
             in Action<CmdReader, CmdHandler> args = null,
             in Func<CmdHandler, string> action1 = null,
-            in Func<CmdHandler, IEnumerator<RoutineStatus>> routine2 = null
+            in Func<CmdHandler, ReadHandler, IEnumerator<RoutineStatus>> routine2 = null
         ) : base(name)
         {
             this.arguments = args;
@@ -132,24 +143,44 @@ namespace _TERM_
 
                     if (routine2 != null)
                     {
-                        using var routine = routine2(handler);
-                        RoutineStatus last_status = default;
+                        ReadHandler hreader = new(reader);
+                        using var routine = routine2(handler, hreader);
 
                         while (routine.MoveNext())
-                        {
-                            last_status = routine.Current;
-
-                            if (last_status.assigned)
+                            if (routine.Current.prompt != null)
                             {
-                                var estatus = connection.ESend(new CmdClient.CmdResponse_status(last_status));
+                                var estatus = connection.ESend(new CmdClient.CmdResponse_prompt(routine.Current.prompt));
                                 while (estatus.MoveNext())
                                     yield return null;
+
+                                var task = connection.reader.ReadLineAsync();
+                                while (!task.IsCompleted)
+                                    yield return null;
+
+                                string rawtext = task.Result;
+                                if (rawtext == null)
+                                    break;
+
+                                JObject jrequest = JsonConvert.DeserializeObject<JObject>(rawtext);
+                                string error = null;
+
+                                if (!jrequest.TryGetValue("type", StringComparison.OrdinalIgnoreCase, out var _type))
+                                    error = $"no {typeof(CmdTypes).FullName} specified";
+                                else if (!Enum.TryParse((string)_type, true, out CmdTypes type))
+                                    error = $"Unknown type '{(string)_type}'";
+                                else
+                                {
+                                    hreader.reader = new(
+                                        type: type,
+                                        line: (string)jrequest["cmdline"],
+                                        cursor: jrequest.TryGetValue("cursor", out var _cursor) ? (int)_cursor : 0
+                                    );
+                                }
                             }
                             else
                                 yield return null;
-                        }
 
-                        var eresult = connection.ESend(new CmdClient.CmdResponse_result(last_status.assigned ? last_status.result : null));
+                        var eresult = connection.ESend(new CmdClient.CmdResponse_result(routine.Current.result));
                         while (eresult.MoveNext())
                             yield return null;
                     }
