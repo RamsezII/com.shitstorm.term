@@ -18,7 +18,7 @@ namespace _TERM_
 
         //----------------------------------------------------------------------------------------------------------
 
-        internal abstract IEnumerator HandleRequest(CmdClient connection, CmdReader reader);
+        internal abstract IEnumerator HandleRequest(CmdClient connection, ReadHandler hreader);
     }
 
     public sealed class CmdNamespace : CmdNode
@@ -40,22 +40,22 @@ namespace _TERM_
 
         //----------------------------------------------------------------------------------------------------------
 
-        internal override IEnumerator HandleRequest(CmdClient connection, CmdReader reader)
+        internal override IEnumerator HandleRequest(CmdClient connection, ReadHandler hreader)
         {
-            bool read_b = reader.TryRead(out string read);
+            bool read_b = hreader._reader.TryRead(out string read);
 
-            if (reader.IsOnCompletion())
+            if (hreader._reader.IsOnCompletion())
             {
-                reader.compl_candidates.AddRange(cmd_nodes.Keys);
-                reader.compl_candidates.Sort();
+                hreader._reader.compl_candidates.AddRange(cmd_nodes.Keys);
+                hreader._reader.compl_candidates.Sort();
                 return null;
             }
             else if (!read_b)
-                reader.WriteError($"expected command or namespace name (in namespace '{name}')");
+                hreader._reader.WriteError($"expected command or namespace name (in namespace '{name}')");
             else if (!cmd_nodes.TryGetValue(read, out var node))
-                reader.WriteError($"no command or namespace called '{read}' in namespace '{name}'");
+                hreader._reader.WriteError($"no command or namespace called '{read}' in namespace '{name}'");
             else
-                return node.HandleRequest(connection, reader);
+                return node.HandleRequest(connection, hreader);
 
             return null;
         }
@@ -93,16 +93,7 @@ namespace _TERM_
             public readonly Dictionary<string, object> options = new(StringComparer.Ordinal);
         }
 
-        public sealed class ReadHandler
-        {
-            public CmdReader reader;
-            public ReadHandler(in CmdReader reader)
-            {
-                this.reader = reader;
-            }
-        }
-
-        public readonly Action<CmdReader, CmdHandler> arguments;
+        public readonly Action<CmdReader, CmdHandler> args;
         public readonly Func<CmdHandler, string> action1;
         public readonly Func<CmdHandler, ReadHandler, IEnumerator<RoutineStatus>> routine2;
 
@@ -110,21 +101,21 @@ namespace _TERM_
 
         public CmdCommand(in string name, in Action<CmdReader, CmdHandler> args = null, in Func<CmdHandler, string> action1 = null, in Func<CmdHandler, ReadHandler, IEnumerator<RoutineStatus>> routine2 = null) : base(name)
         {
-            this.arguments = args;
+            this.args = args;
             this.action1 = action1;
             this.routine2 = routine2;
         }
 
         //----------------------------------------------------------------------------------------------------------
 
-        internal override IEnumerator HandleRequest(CmdClient connection, CmdReader reader)
+        internal override IEnumerator HandleRequest(CmdClient connection, ReadHandler hreader)
         {
             CmdHandler handler = new();
 
-            arguments?.Invoke(reader, handler);
+            args?.Invoke(hreader._reader, handler);
 
-            if (!reader.HasError)
-                if (reader.type == CmdTypes.Execute)
+            if (!hreader._reader.HasError)
+                if (hreader._reader.type == CmdTypes.Execute)
                 {
                     if (action1 != null)
                     {
@@ -136,7 +127,6 @@ namespace _TERM_
 
                     if (routine2 != null)
                     {
-                        ReadHandler hreader = new(reader);
                         using var routine = routine2(handler, hreader);
                         RoutineStatus last_status = default;
                         bool interrupted = false;
@@ -172,7 +162,7 @@ namespace _TERM_
                                     break;
                                 }
 
-                                hreader.reader = new(type: CmdTypes.Execute, line: input.cmdline);
+                                hreader._reader = new(type: CmdTypes.Execute, line: input.cmdline);
                             }
                             else
                                 yield return null;

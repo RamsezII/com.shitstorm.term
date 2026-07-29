@@ -10,6 +10,15 @@ namespace _TERM_
         Execute,
     }
 
+    public sealed class ReadHandler
+    {
+        public CmdReader _reader;
+        public ReadHandler(in CmdReader reader)
+        {
+            this._reader = reader;
+        }
+    }
+
     public struct CmdReader
     {
         internal CmdTypes type;

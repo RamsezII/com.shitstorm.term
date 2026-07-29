@@ -71,11 +71,11 @@ namespace _TERM_
 
             //----------------------------------------------------------------------------------------------------------
 
-            internal CmdResponse_completions(in int start, in int end, in IList<string> candidates) : base(RespTypes.completion)
+            internal CmdResponse_completions(in CmdReader reader) : base(RespTypes.completion)
             {
-                this.start = start;
-                this.end = end;
-                this.candidates = candidates;
+                start = reader.compl_start;
+                end = reader.compl_end;
+                candidates = reader.compl_candidates;
             }
         }
 

@@ -70,14 +70,20 @@ namespace _TERM_.Tests
                 routine2: static (handler, hreader) =>
                 {
                     return EPromptTest(hreader);
-
-                    static IEnumerator<CmdCommand.RoutineStatus> EPromptTest(CmdCommand.ReadHandler hreader)
+                    static IEnumerator<CmdCommand.RoutineStatus> EPromptTest(ReadHandler hreader)
                     {
                         yield return new(prompt: "Ton nom", progress: 0, result: null);
-                        string name = hreader.reader.line.Trim();
+                        hreader._reader.TryRead(out string name);
+
+                        if (hreader._reader.IsOnCompletion())
+                        {
+                            hreader._reader.compl_candidates.Add("Josué");
+                            hreader._reader.compl_candidates.Add("Devante");
+                            hreader._reader.compl_candidates.Add("ShittyG");
+                        }
 
                         yield return new(prompt: "Ta couleur préférée", progress: 0.5f, result: null);
-                        string color = hreader.reader.line.Trim();
+                        hreader._reader.TryRead(out string color);
 
                         yield return new(prompt: null, progress: 1, result: $"Salut {name}, ta couleur préférée est {color}.");
                     }
