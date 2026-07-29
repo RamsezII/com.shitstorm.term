@@ -12,12 +12,16 @@ namespace _TERM_
     {
         void OnUnityLog(string message, string stackTrace, LogType logType)
         {
+            LogClient[] connections;
+
             lock (log_connections)
-                foreach (var conn in log_connections)
-                    if (logType == LogType.Exception)
-                        _ = conn.ASend(new LogClient.LogResponse_exception(message, stackTrace));
-                    else
-                        _ = conn.ASend(new LogClient.LogResponse((LogClient.LogTypes)logType, message));
+                connections = log_connections.ToArray();
+
+            foreach (var connection in connections)
+                if (logType == LogType.Exception)
+                    _ = connection.ASend(new LogClient.LogResponse_exception(message, stackTrace));
+                else
+                    _ = connection.ASend(new LogClient.LogResponse((LogClient.LogTypes)logType, message));
         }
 
         //----------------------------------------------------------------------------------------------------------
@@ -36,11 +40,6 @@ namespace _TERM_
 
                     // Le canal est serveur -> client. Cette tâche détecte seulement sa fermeture par le terminal.
                     _ = WatchLogConnectionAsync(connection, token);
-
-                    await connection.ASend(new LogClient.LogResponse(
-                        type: LogClient.LogTypes.log,
-                        message: "Unity log stream connected."
-                    ));
                 }
             }
             catch (ObjectDisposedException) when (token.IsCancellationRequested)
@@ -57,6 +56,11 @@ namespace _TERM_
         {
             try
             {
+                await connection.ASend(new LogClient.LogResponse(
+                    type: LogClient.LogTypes.log,
+                    message: "Unity log stream connected."
+                ));
+
                 while (!token.IsCancellationRequested)
                     if (await connection.reader.ReadLineAsync() == null)
                         break;

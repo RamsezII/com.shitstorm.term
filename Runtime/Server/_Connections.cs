@@ -27,42 +27,7 @@ namespace _TERM_
                     lock (cmd_connections)
                         cmd_connections.Add(connection);
 
-                    try
-                    {
-                        await connection.ASend(new CmdClient.CmdResponse_intro());
-
-                        while (!token.IsCancellationRequested)
-                            try
-                            {
-                                string json = await connection.reader.ReadLineAsync();
-                                if (json == null)
-                                    break;
-
-                                lock (routines)
-                                    routines.Add(EOnIncomingCommand(connection, json));
-                            }
-                            catch (Exception e)
-                            {
-                                await connection.ASend(new CmdClient.CmdResponse_exception(e));
-                            }
-                    }
-                    catch (Exception exception) when (
-                        token.IsCancellationRequested ||
-                        exception is IOException ||
-                        exception is ObjectDisposedException ||
-                        exception is SocketException)
-                    {
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.LogException(e);
-                    }
-                    finally
-                    {
-                        lock (cmd_connections)
-                            cmd_connections.Remove(connection);
-                        connection.Dispose();
-                    }
+                    _ = HandleCommandConnectionAsync(connection, token);
                 }
             }
             catch (ObjectDisposedException) when (token.IsCancellationRequested)
@@ -70,6 +35,49 @@ namespace _TERM_
             }
             catch (SocketException) when (token.IsCancellationRequested)
             {
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+        }
+
+        //----------------------------------------------------------------------------------------------------------
+
+        async Task HandleCommandConnectionAsync(CmdClient connection, CancellationToken token)
+        {
+            try
+            {
+                await connection.ASend(new CmdClient.CmdResponse_intro());
+
+                while (!token.IsCancellationRequested)
+                {
+                    string json = await connection.reader.ReadLineAsync();
+                    if (json == null)
+                        break;
+
+                    lock (routines)
+                        routines.Add(EOnIncomingCommand(connection, json));
+                }
+            }
+            catch (Exception exception) when (
+                token.IsCancellationRequested ||
+                exception is IOException ||
+                exception is ObjectDisposedException ||
+                exception is SocketException)
+            {
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+                await connection.ASend(new CmdClient.CmdResponse_exception(e));
+            }
+            finally
+            {
+                lock (cmd_connections)
+                    cmd_connections.Remove(connection);
+
+                connection.Dispose();
             }
         }
 

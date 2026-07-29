@@ -33,13 +33,13 @@ namespace _TERM_
 
             //----------------------------------------------------------------------------------------------------------
 
-            internal LogResponse_exception(in Exception e) : this(e.Message.Trim('\n', '\r'), e.StackTrace.Trim('\n', '\r'))
+            internal LogResponse_exception(in Exception e) : this(e.Message?.Trim('\n', '\r') ?? e.GetType().FullName, e.StackTrace?.Trim('\n', '\r') ?? string.Empty)
             {
             }
 
-            internal LogResponse_exception(in string message, in string stacktrace) : base(LogTypes.exception, message.Trim('\n', '\r'))
+            internal LogResponse_exception(in string message, in string stacktrace) : base(LogTypes.exception, message?.Trim('\n', '\r') ?? string.Empty)
             {
-                this.stacktrace = stacktrace.Trim('\n', '\r');
+                this.stacktrace = stacktrace?.Trim('\n', '\r') ?? string.Empty;
             }
         }
     }

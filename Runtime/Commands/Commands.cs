@@ -120,18 +120,23 @@ namespace _TERM_
             if (routine2 != null)
             {
                 using var routine = routine2(reader);
+                RoutineStatus last_status = default;
 
                 while (routine.MoveNext())
-                    if (routine.Current.assigned)
+                {
+                    last_status = routine.Current;
+
+                    if (last_status.assigned)
                     {
-                        var estatus = connection.ESend(new CmdClient.CmdResponse_status(routine.Current));
+                        var estatus = connection.ESend(new CmdClient.CmdResponse_status(last_status));
                         while (estatus.MoveNext())
                             yield return null;
                     }
                     else
                         yield return null;
+                }
 
-                var eresult = connection.ESend(new CmdClient.CmdResponse_result(routine.Current.result));
+                var eresult = connection.ESend(new CmdClient.CmdResponse_result(last_status.assigned ? last_status.result : null));
                 while (eresult.MoveNext())
                     yield return null;
             }

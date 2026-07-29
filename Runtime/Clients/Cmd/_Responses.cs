@@ -12,6 +12,7 @@ namespace _TERM_
             error,
             exception,
             completion,
+            status,
             result,
         }
 
@@ -58,8 +59,8 @@ namespace _TERM_
 
             internal CmdResponse_exception(in Exception e) : base(RespTypes.exception)
             {
-                stacktrace = e.StackTrace.Trim('\n', '\r');
-                message = e.Message.Trim('\n', '\r');
+                stacktrace = e.StackTrace?.Trim('\n', '\r') ?? string.Empty;
+                message = e.Message?.Trim('\n', '\r') ?? e.GetType().FullName;
             }
         }
 
@@ -85,7 +86,7 @@ namespace _TERM_
 
             //----------------------------------------------------------------------------------------------------------
 
-            internal CmdResponse_status(in CmdCommand.RoutineStatus status) : base(RespTypes.result)
+            internal CmdResponse_status(in CmdCommand.RoutineStatus status) : base(RespTypes.status)
             {
                 progress = status.progress;
                 prompt = status.prompt;

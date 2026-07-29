@@ -13,6 +13,7 @@ namespace _TERM_
         readonly TcpClient tcpClient;
         readonly StreamWriter writer;
         readonly SemaphoreSlim writeLock = new(1, 1);
+        int dispose_state;
 
         public readonly StreamReader reader;
 
@@ -67,7 +68,32 @@ namespace _TERM_
 
         public void Dispose()
         {
+            if (Interlocked.Exchange(ref dispose_state, 1) != 0)
+                return;
+
             tcpClient.Close();
+
+            try
+            {
+                reader.Dispose();
+            }
+            catch (Exception exception) when (
+                exception is IOException ||
+                exception is ObjectDisposedException ||
+                exception is SocketException)
+            {
+            }
+
+            try
+            {
+                writer.Dispose();
+            }
+            catch (Exception exception) when (
+                exception is IOException ||
+                exception is ObjectDisposedException ||
+                exception is SocketException)
+            {
+            }
         }
     }
 }
