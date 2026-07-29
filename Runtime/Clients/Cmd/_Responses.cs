@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
 namespace _TERM_
@@ -29,7 +30,7 @@ namespace _TERM_
 
         internal sealed class CmdResponse_intro : CmdResponse
         {
-            public string project_name = Application.productName;
+            public string default_prompt = Directory.GetCurrentDirectory().Replace('\\', '/');
 
             //----------------------------------------------------------------------------------------------------------
 
