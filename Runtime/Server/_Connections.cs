@@ -29,6 +29,8 @@ namespace _TERM_
 
                     try
                     {
+                        await connection.ASend(new CmdClient.CmdResponse_intro());
+
                         while (!token.IsCancellationRequested)
                             try
                             {

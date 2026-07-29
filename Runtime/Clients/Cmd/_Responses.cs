@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace _TERM_
 {
@@ -7,6 +8,7 @@ namespace _TERM_
     {
         internal enum RespTypes : byte
         {
+            intro,
             error,
             exception,
             completion,
@@ -22,6 +24,17 @@ namespace _TERM_
             protected CmdResponse(in RespTypes type)
             {
                 this.type = type;
+            }
+        }
+
+        internal sealed class CmdResponse_intro : CmdResponse
+        {
+            public string project_name = Application.productName;
+
+            //----------------------------------------------------------------------------------------------------------
+
+            internal CmdResponse_intro() : base(RespTypes.intro)
+            {
             }
         }
 
