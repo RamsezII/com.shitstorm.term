@@ -12,7 +12,7 @@ namespace _TERM_
             error,
             exception,
             completion,
-            status,
+            prompt,
             result,
         }
 
@@ -85,7 +85,7 @@ namespace _TERM_
 
             //----------------------------------------------------------------------------------------------------------
 
-            internal CmdResponse_prompt(in string prompt) : base(RespTypes.status)
+            internal CmdResponse_prompt(in string prompt) : base(RespTypes.prompt)
             {
                 this.prompt = prompt;
             }

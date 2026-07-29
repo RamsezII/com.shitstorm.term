@@ -32,7 +32,7 @@ namespace _TERM_.Tests
                     else
                         handler.args.Add(0);
                 },
-                routine2: static handler =>
+                routine2: static (handler, hreader) =>
                 {
                     float seconds = (float)handler.args[0];
                     return EWait(seconds);
@@ -50,7 +50,7 @@ namespace _TERM_.Tests
 
             TermServer.root_commands.AddCommandNode(new CmdCommand(
                 name: "wait_1second",
-                routine2: static handler =>
+                routine2: static (handler, hreader) =>
                 {
                     return EWait();
                     static IEnumerator<CmdCommand.RoutineStatus> EWait()
