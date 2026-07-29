@@ -1,10 +1,7 @@
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -13,65 +10,8 @@ namespace _TERM_
 {
     partial class TermServer
     {
-        internal sealed class ClientConnection : IDisposable
-        {
-            readonly TcpClient tcpClient;
-            readonly StreamWriter writer;
-            readonly SemaphoreSlim writeLock = new(1, 1);
-
-            public readonly StreamReader reader;
-
-            //----------------------------------------------------------------------------------------------------------
-
-            public ClientConnection(TcpClient tcpClient)
-            {
-                this.tcpClient = tcpClient;
-
-                NetworkStream stream = tcpClient.GetStream();
-
-                reader = new StreamReader(stream, new UTF8Encoding(false), false, 1024, true);
-
-                writer = new StreamWriter(stream, new UTF8Encoding(false), 1024, true)
-                {
-                    AutoFlush = true
-                };
-            }
-
-            //----------------------------------------------------------------------------------------------------------
-
-            public async Task SendAsync(JObject response)
-            {
-                string json = JsonConvert.SerializeObject(response, Formatting.None);
-
-                await writeLock.WaitAsync();
-
-                try
-                {
-                    await writer.WriteLineAsync(json);
-                }
-                catch (Exception exception) when (
-                    exception is IOException ||
-                    exception is ObjectDisposedException ||
-                    exception is SocketException)
-                {
-                }
-                finally
-                {
-                    writeLock.Release();
-                }
-            }
-
-            //----------------------------------------------------------------------------------------------------------
-
-            public void Dispose()
-            {
-                tcpClient.Close();
-            }
-        }
-
-        readonly List<ClientConnection> commandConnections = new();
-        readonly List<ClientConnection> logConnections = new();
-        readonly object connectionsLock = new();
+        readonly List<CmdClient> cmd_connections = new();
+        readonly List<LogClient> log_connections = new();
 
         //----------------------------------------------------------------------------------------------------------
 
@@ -82,10 +22,10 @@ namespace _TERM_
                 while (!token.IsCancellationRequested)
                 {
                     TcpClient tcpClient = await cmd_listener.AcceptTcpClientAsync();
-                    var connection = new ClientConnection(tcpClient);
+                    var connection = new CmdClient(tcpClient);
 
-                    lock (connectionsLock)
-                        commandConnections.Add(connection);
+                    lock (cmd_connections)
+                        cmd_connections.Add(connection);
 
                     try
                     {
@@ -100,12 +40,7 @@ namespace _TERM_
                             }
                             catch (Exception e)
                             {
-                                await connection.SendAsync(new JObject
-                                {
-                                    ["type"] = "exception",
-                                    ["stacktrace"] = e.StackTrace.Trim('\r', '\n'),
-                                    ["message"] = e.Message.Trim('\r', '\n'),
-                                });
+                                await connection.ASend(new CmdClient.CmdResponse_exception(e));
                             }
                     }
                     catch (Exception exception) when (
@@ -121,8 +56,8 @@ namespace _TERM_
                     }
                     finally
                     {
-                        lock (connectionsLock)
-                            commandConnections.Remove(connection);
+                        lock (cmd_connections)
+                            cmd_connections.Remove(connection);
                         connection.Dispose();
                     }
                 }
@@ -139,16 +74,18 @@ namespace _TERM_
 
         void CloseAllConnections()
         {
-            lock (connectionsLock)
+            lock (cmd_connections)
             {
-                foreach (ClientConnection connection in commandConnections)
+                foreach (TermClient connection in cmd_connections)
                     connection.Dispose();
+                cmd_connections.Clear();
+            }
 
-                foreach (ClientConnection connection in logConnections)
+            lock (log_connections)
+            {
+                foreach (TermClient connection in log_connections)
                     connection.Dispose();
-
-                commandConnections.Clear();
-                logConnections.Clear();
+                log_connections.Clear();
             }
         }
     }

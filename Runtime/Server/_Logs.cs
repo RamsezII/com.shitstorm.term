@@ -12,20 +12,9 @@ namespace _TERM_
     {
         void OnUnityLog(string message, string stackTrace, LogType logType)
         {
-            ClientConnection[] snapshot;
-
-            // Seules les connexions du port de logs reçoivent le broadcast.
-            lock (connectionsLock)
-                snapshot = logConnections.ToArray();
-
-            var response = new JObject
-            {
-                ["type"] = "log",
-                ["text"] = $"[{logType}] {message}",
-            };
-
-            foreach (ClientConnection connection in snapshot)
-                _ = connection.SendAsync(response);
+            lock (log_connections)
+                foreach (var conn in log_connections)
+                    _ = conn.ASend(new LogClient.LogResponse((LogClient.RespTypes)logType, message));
         }
 
         //----------------------------------------------------------------------------------------------------------
@@ -37,19 +26,18 @@ namespace _TERM_
                 while (!token.IsCancellationRequested)
                 {
                     TcpClient tcpClient = await log_listener.AcceptTcpClientAsync();
-                    var connection = new ClientConnection(tcpClient);
+                    var connection = new LogClient(tcpClient);
 
-                    lock (connectionsLock)
-                        logConnections.Add(connection);
+                    lock (log_connections)
+                        log_connections.Add(connection);
 
                     // Le canal est serveur -> client. Cette tâche détecte seulement sa fermeture par le terminal.
                     _ = WatchLogConnectionAsync(connection, token);
 
-                    await connection.SendAsync(new JObject
-                    {
-                        ["type"] = "info",
-                        ["text"] = "Unity log stream connected.",
-                    });
+                    await connection.ASend(new LogClient.LogResponse(
+                        type: LogClient.RespTypes.Log,
+                        message: "Unity log stream connected."
+                    ));
                 }
             }
             catch (ObjectDisposedException) when (token.IsCancellationRequested)
@@ -62,7 +50,7 @@ namespace _TERM_
 
         //----------------------------------------------------------------------------------------------------------
 
-        async Task WatchLogConnectionAsync(ClientConnection connection, CancellationToken token)
+        async Task WatchLogConnectionAsync(LogClient connection, CancellationToken token)
         {
             try
             {
@@ -83,8 +71,8 @@ namespace _TERM_
             }
             finally
             {
-                lock (connectionsLock)
-                    logConnections.Remove(connection);
+                lock (log_connections)
+                    log_connections.Remove(connection);
 
                 connection.Dispose();
             }
