@@ -1,162 +1,312 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.IO;
-using System.Net.Sockets;
-using System.Threading;
 using System.Threading.Tasks;
-using UnityEngine;
 
 namespace _TERM_
 {
-    partial class TermServer
+    public abstract class CmdNode
     {
+        public readonly string name;
 
         //----------------------------------------------------------------------------------------------------------
 
-        async Task HandleCommandConnectionAsync(ClientConnection connection, CancellationToken token)
+        protected CmdNode(in string name)
         {
-            try
+            this.name = name;
+        }
+
+        //----------------------------------------------------------------------------------------------------------
+
+        internal abstract IEnumerator<JObject> HandleRequest(TermServer.ClientConnection connection, CmdReader reader);
+    }
+
+    public sealed class CmdNamespace : CmdNode
+    {
+        public readonly Dictionary<string, CmdNode> cmd_nodes = new(StringComparer.OrdinalIgnoreCase);
+
+        //----------------------------------------------------------------------------------------------------------
+
+        public CmdNamespace(in string name) : base(name)
+        {
+        }
+
+        //----------------------------------------------------------------------------------------------------------
+
+        public void AddCommandNode(in CmdNode node)
+        {
+            cmd_nodes.Add(node.name, node);
+        }
+
+        //----------------------------------------------------------------------------------------------------------
+
+        internal override IEnumerator<JObject> HandleRequest(TermServer.ClientConnection connection, CmdReader reader)
+        {
+            string error = null;
+
+            if (!reader.TryRead(out string read))
+                error ??= $"";
+            else if (!cmd_nodes.TryGetValue(read, out var node))
             {
-                while (!token.IsCancellationRequested)
+                IEnumerator<JObject> routine = node.HandleRequest(connection, reader);
+                if (routine != null)
+                    while (routine.MoveNext())
+                        yield return routine.Current;
+            }
+
+            if (error != null)
+                yield return new JObject()
                 {
-                    string json = await connection.reader.ReadLineAsync();
-                    if (json == null)
-                        break;
+                    ["type"] = "error",
+                    ["error_message"] = error,
+                };
+        }
+    }
 
-                    JObject jrequest;
-                    try
-                    {
-                        jrequest = JsonConvert.DeserializeObject<JObject>(json);
-                    }
-                    catch (ArgumentException)
-                    {
-                        await connection.SendAsync(Error("Invalid JSON."));
-                        continue;
-                    }
+    public sealed class CmdCommand : CmdNode
+    {
+        public readonly struct CmdStatus
+        {
+            public readonly float progress;
+            public readonly string prompt, result;
+            public readonly bool assigned;
 
-                    JObject jresponse;
+            //----------------------------------------------------------------------------------------------------------
 
-                    switch ((string)jrequest["type"])
-                    {
-                        // TAB demande des propositions sans exécuter.
-                        case "complete":
-                            jresponse = new JObject()
-                            {
-                                ["type"] = "completion",
-                                ["candidates"] = JsonConvert.SerializeObject(Complete((string)jrequest["text"]), Formatting.None),
-                            };
-                            break;
-
-                        // ENTRÉE exécute et attend le résultat.
-                        case "execute":
-                            jresponse = await ExecuteCommandAsync((string)jrequest["text"]);
-                            break;
-
-                        default:
-                            jresponse = Error("Expected 'complete' or 'execute'.");
-                            break;
-                    }
-
-                    // Réponse directe sur la connexion qui a émis la requête.
-                    await connection.SendAsync(jresponse);
-
-                    if (jresponse.ContainsKey("close"))
-                        break;
-                }
-            }
-            catch (Exception exception) when (
-                token.IsCancellationRequested ||
-                exception is IOException ||
-                exception is ObjectDisposedException ||
-                exception is SocketException)
+            public CmdStatus(in string prompt, in float progress, in string result)
             {
+                this.progress = progress;
+                this.prompt = prompt;
+                this.result = result;
+                assigned = true;
             }
-            finally
-            {
-                lock (connectionsLock)
-                    commandConnections.Remove(connection);
+        }
 
-                connection.Dispose();
-            }
+        public readonly List<object> completions = null;
+        public readonly Action<CmdReader, CmdCommand> onRefreshCompletions;
+        public readonly Func<CmdReader, string> action;
+        public readonly Func<CmdReader, IEnumerator<CmdStatus>> routine;
+
+        //----------------------------------------------------------------------------------------------------------
+
+        CmdCommand(
+            in string name,
+            in Func<CmdReader, string> action,
+            in Func<CmdReader, IEnumerator<CmdStatus>> routine,
+            in List<object> completions = null,
+            in Action<CmdReader, CmdCommand> onRefreshCompletions = null
+        ) : base(name)
+        {
+            this.action = action;
+            this.routine = routine;
+            this.completions = completions;
+            this.onRefreshCompletions = onRefreshCompletions;
+        }
+
+        public CmdCommand(
+            in string name,
+            in Func<CmdReader, string> action,
+            in List<object> completions = null,
+            in Action<CmdReader, CmdCommand> onRefreshCompletions = null
+        ) : this(name, action, null, completions, onRefreshCompletions)
+        {
+        }
+
+        public CmdCommand(
+            in string name,
+            in Func<CmdReader, IEnumerator<CmdStatus>> routine,
+            in List<object> completions = null,
+            in Action<CmdReader, CmdCommand> onRefreshCompletions = null
+        ) : this(name, null, routine, completions, onRefreshCompletions)
+        {
         }
 
         //----------------------------------------------------------------------------------------------------------
 
-        static string[] Complete(string text)
+        internal override IEnumerator<JObject> HandleRequest(TermServer.ClientConnection connection, CmdReader reader)
         {
-            string input = (text ?? string.Empty).TrimStart();
-
-            // Démo simple : complétion du premier mot seulement.
-            if (input.Contains(" "))
-                return Array.Empty<string>();
-
-            string[] commands = { "help", "ping", "echo", "wait", "quit" };
-            var matches = new List<string>();
-
-            foreach (string command in commands)
+            switch (reader.type)
             {
-                if (command.StartsWith(input, StringComparison.OrdinalIgnoreCase))
-                    matches.Add(command);
-            }
-
-            return matches.ToArray();
-        }
-
-        //----------------------------------------------------------------------------------------------------------
-
-        static async Task<JObject> ExecuteCommandAsync(string text)
-        {
-            string commandLine = (text ?? string.Empty).Trim();
-            int separator = commandLine.IndexOf(' ');
-            string command = (separator < 0 ? commandLine : commandLine[..separator]).ToLowerInvariant();
-            string arguments = separator < 0 ? string.Empty : commandLine[(separator + 1)..];
-
-            switch (command)
-            {
-                case "help":
-                    return Result("Commands: help, ping, echo <text>, wait, quit");
-
-                case "ping":
-                    return Result("pong");
-
-                case "echo":
-                    return Result(arguments);
-
-                case "wait":
-                    // Le prompt attend, mais le canal logs continue indépendamment.
-                    Debug.Log("[TERM test] wait started");
-                    await Task.Delay(2000);
-                    Debug.Log("[TERM test] wait finished");
-                    return Result("wait finished");
-
-                case "quit":
-                case "exit":
-                    return new JObject
+                case CmdTypes.Complete:
+                    onRefreshCompletions?.Invoke(reader, this);
+                    yield return new()
                     {
-                        ["type"] = "result",
-                        ["text"] = "Goodbye.",
-                        ["close"] = true,
+                        ["type"] = "completion",
+                        ["candidates"] = JsonConvert.SerializeObject(completions, Formatting.None)
                     };
+                    break;
+
+                case CmdTypes.Execute:
+                    {
+                        string result = default;
+
+                        if (action != null)
+                            result = action(reader);
+                        else
+                        {
+                            using var routine = this.routine(reader);
+
+                            while (routine.MoveNext())
+                                if (routine.Current.assigned)
+                                    yield return new()
+                                    {
+                                        ["type"] = "prompt",
+                                        ["prompt"] = routine.Current.prompt,
+                                    };
+                                else
+                                    yield return null;
+
+                            result = routine.Current.result;
+                        }
+
+                        if (result != null)
+                            yield return new()
+                            {
+                                ["type"] = "result",
+                                ["result"] = result.ToString(),
+                            };
+                    }
+                    break;
 
                 default:
-                    return Error($"Unknown command: {command}");
+                    yield return new()
+                    {
+                        ["type"] = "error",
+                        ["error_message"] = $"Unexpected {typeof(CmdTypes).FullName} '{reader.type}'",
+                    };
+                    break;
             }
+        }
+    }
+
+    public enum CmdTypes : byte
+    {
+        Complete,
+        Check,
+        Execute,
+    }
+
+    public struct CmdReader
+    {
+        public readonly string line;
+        public readonly CmdTypes type;
+        public readonly int cursor;
+        public int start_i, read_i;
+        public string error;
+
+        //----------------------------------------------------------------------------------------------------------
+
+        public CmdReader(in string line, in CmdTypes type, in int cursor = 0)
+        {
+            this.line = line;
+            this.type = type;
+            this.cursor = cursor;
+            start_i = 0;
+            read_i = 0;
+            error = null;
         }
 
         //----------------------------------------------------------------------------------------------------------
 
-        static JObject Result(string text) => new()
+        public void SkipEmpties()
         {
-            ["type"] = "result",
-            ["text"] = text,
-        };
+            while (read_i < line.Length && line[read_i] switch
+            {
+                ' ' or '\n' => true,
+                _ => false,
+            })
+                ++read_i;
+        }
 
-        static JObject Error(string text) => new()
+        public void SkipNoneEmpties()
         {
-            ["type"] = "error",
-            ["text"] = text,
-        };
+            while (read_i < line.Length && line[read_i] switch
+            {
+                ' ' or '\n' => false,
+                _ => true,
+            })
+                ++read_i;
+        }
+
+        public bool TryRead(out string output)
+        {
+            SkipEmpties();
+
+            if (read_i < line.Length)
+            {
+                int old_read_i = read_i;
+                SkipNoneEmpties();
+
+                if (read_i > old_read_i)
+                {
+                    output = line[old_read_i..read_i];
+                    SkipEmpties();
+                    return true;
+                }
+            }
+
+            output = null;
+            return false;
+        }
+    }
+
+    partial class TermServer
+    {
+        public static readonly CmdNamespace root_commands = new(nameof(root_commands));
+
+        readonly List<IEnumerator> routines = new();
+
+        //----------------------------------------------------------------------------------------------------------
+
+        void TickRoutines()
+        {
+            lock (routines)
+                for (int i = routines.Count - 1; i >= 0; i--)
+                    if (!routines[i].MoveNext())
+                    {
+                        routines[i] = routines[^1];
+                        routines.RemoveAt(routines.Count - 1);
+                    }
+        }
+
+        static IEnumerator EOnIncomingCommand(ClientConnection connection, string json)
+        {
+            JObject jrequest = JsonConvert.DeserializeObject<JObject>(json);
+            JObject jresponse = null;
+            string error = null;
+
+            if (!jrequest.TryGetValue("type", StringComparison.OrdinalIgnoreCase, out var _type))
+                error = "no type specified";
+            else if (!Enum.TryParse((string)_type, true, out CmdTypes type))
+                error = $"Unknown type '{(string)_type}'";
+            else
+            {
+                CmdReader reader = new(
+                    line: (string)jrequest["cmdline"],
+                    type: type,
+                    cursor: jrequest.TryGetValue("cursor", out var _cursor) ? (int)_cursor : 0
+                );
+
+                var routine = root_commands.HandleRequest(connection, reader);
+                while (routine.MoveNext())
+                    yield return null;
+            }
+
+            if (error != null)
+                jresponse = new()
+                {
+                    ["type"] = "error",
+                    ["message"] = "no type specified",
+                };
+
+            if (jresponse != null)
+            {
+                Task task = connection.SendAsync(jresponse);
+                while (!task.IsCompleted)
+                    yield return null;
+            }
+        }
     }
 }

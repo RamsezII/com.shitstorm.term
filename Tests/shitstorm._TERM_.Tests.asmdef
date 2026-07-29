@@ -1,0 +1,16 @@
+{
+    "name": "shitstorm._TERM_.Tests",
+    "rootNamespace": "_TERM_.Tests",
+    "references": [
+        "GUID:0308a0376a5119646aa5084f7da0a023"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

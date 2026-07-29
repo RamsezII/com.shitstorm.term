@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace _TERM_
 {
-    internal partial class TermServer : MonoBehaviour
+    public partial class TermServer : MonoBehaviour
     {
         [Header("TCP Server")]
         [SerializeField, Range(1, ushort.MaxValue)] ushort port_log = 5051, port_cmd = 5050;
@@ -39,6 +39,11 @@ namespace _TERM_
         }
 
         //----------------------------------------------------------------------------------------------------------
+
+        private void Update()
+        {
+            TickRoutines();
+        }
 
         [ContextMenu(nameof(StartServer))]
         public void StartServer()

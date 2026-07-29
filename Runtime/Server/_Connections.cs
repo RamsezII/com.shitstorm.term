@@ -13,7 +13,7 @@ namespace _TERM_
 {
     partial class TermServer
     {
-        sealed class ClientConnection : IDisposable
+        internal sealed class ClientConnection : IDisposable
         {
             readonly TcpClient tcpClient;
             readonly StreamWriter writer;
@@ -87,7 +87,44 @@ namespace _TERM_
                     lock (connectionsLock)
                         commandConnections.Add(connection);
 
-                    _ = HandleCommandConnectionAsync(connection, token);
+                    try
+                    {
+                        while (!token.IsCancellationRequested)
+                            try
+                            {
+                                string json = await connection.reader.ReadLineAsync();
+                                if (json == null)
+                                    break;
+                                lock (routines)
+                                    routines.Add(EOnIncomingCommand(connection, json));
+                            }
+                            catch (Exception e)
+                            {
+                                await connection.SendAsync(new JObject
+                                {
+                                    ["type"] = "exception",
+                                    ["stacktrace"] = e.StackTrace.Trim('\r', '\n'),
+                                    ["message"] = e.Message.Trim('\r', '\n'),
+                                });
+                            }
+                    }
+                    catch (Exception exception) when (
+                        token.IsCancellationRequested ||
+                        exception is IOException ||
+                        exception is ObjectDisposedException ||
+                        exception is SocketException)
+                    {
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogException(e);
+                    }
+                    finally
+                    {
+                        lock (connectionsLock)
+                            commandConnections.Remove(connection);
+                        connection.Dispose();
+                    }
                 }
             }
             catch (ObjectDisposedException) when (token.IsCancellationRequested)
