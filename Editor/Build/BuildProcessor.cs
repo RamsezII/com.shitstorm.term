@@ -1,4 +1,5 @@
 ﻿#if UNITY_EDITOR
+using _ARK_;
 using System.IO;
 using UnityEditor;
 using UnityEditor.Build;
@@ -7,36 +8,29 @@ using UnityEngine;
 
 namespace _TERM_.Editor
 {
-    static class BuildProcesseur
+    static class BuildProcessor
     {
         [PostProcessBuild(0)]
         static void CopyTermClient(BuildTarget target, string builtPlayerPath)
         {
-            Debug.LogWarning($"COPY TERM CLIENT!");
-            return;
-
-            string executableName = target switch
-            {
-                BuildTarget.StandaloneWindows64 => "unity-term.exe",
-                BuildTarget.StandaloneLinux64 => "unity-term.x86_64",
-                _ => null,
-            };
-
-            if (executableName == null)
+            if (target != BuildTarget.StandaloneWindows64)
                 return;
 
-            string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-
-            string repositoriesRoot = Directory.GetParent(projectRoot)?.FullName ?? throw new BuildFailedException("Impossible de trouver la racine des dépôts.");
-
-            string source = Path.Combine(repositoriesRoot, "TERM_python", "dist", executableName);
+            const string executableName = "unity-term.exe";
+            string source = Path.Combine(
+                Application.dataPath,
+                "_TERM_",
+                "Editor",
+                "Binaries",
+                "Windows-x64",
+                executableName);
 
             if (!File.Exists(source))
                 throw new BuildFailedException($"TERM client absent : {source}");
 
             string buildRoot = Path.GetDirectoryName(builtPlayerPath) ?? throw new BuildFailedException($"Chemin de build invalide : {builtPlayerPath}");
 
-            string toolsDirectory = Path.Combine(buildRoot, "Tools");
+            string toolsDirectory = Path.Combine(buildRoot, ArkMachine.dname_tools);
             Directory.CreateDirectory(toolsDirectory);
 
             string destination = Path.Combine(toolsDirectory, executableName);

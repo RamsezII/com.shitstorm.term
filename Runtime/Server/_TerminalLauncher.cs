@@ -1,3 +1,4 @@
+using _ARK_;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -50,10 +51,16 @@ namespace _TERM_
             if (!forceNew && FocusExistingTerminal())
                 return;
 
-            string executable = ResolveTerminalExecutable(out string searchedPaths);
+            string executable = ResolveTerminalExecutable();
             if (executable == null)
             {
-                Debug.LogError($"[TERM] Client executable not found. Build it with TERM_python/build.py.\nSearched:\n{searchedPaths}", this);
+                Debug.LogError($"[TERM] Terminal launch is not supported on {Application.platform}.", this);
+                return;
+            }
+
+            if (!File.Exists(executable))
+            {
+                Debug.LogError($"[TERM] Client executable not found: {executable}", this);
                 return;
             }
 
@@ -72,78 +79,40 @@ namespace _TERM_
             return forceNew ? $"{title} #{terminal_sequence}" : title;
         }
 
-        string ResolveTerminalExecutable(out string searchedPaths)
+        static string ResolveTerminalExecutable()
         {
-            string executableName = GetTerminalExecutableName();
-            if (executableName == null)
+            string executableName = Application.platform switch
             {
-                searchedPaths = $"Unsupported platform: {Application.platform}";
+                RuntimePlatform.WindowsEditor or RuntimePlatform.WindowsPlayer => "unity-term.exe",
+                RuntimePlatform.LinuxEditor or RuntimePlatform.LinuxPlayer => "unity-term",
+                _ => null,
+            };
+            if (executableName == null)
                 return null;
-            }
-
-            string root = Directory.GetParent(Application.dataPath)?.FullName ?? Application.dataPath;
-            var candidates = new List<string>();
-
-            AddExecutableCandidate(candidates, Environment.GetEnvironmentVariable("TERM_CLIENT_PATH"), root);
-            AddExecutableCandidate(candidates, terminal_executable, root);
-            AddExecutableCandidate(candidates, Path.Combine(root, "TERM", executableName), root);
-            AddExecutableCandidate(candidates, Path.Combine(Application.streamingAssetsPath, "TERM", executableName), root);
 
 #if UNITY_EDITOR
-            string repositoriesRoot = Directory.GetParent(root)?.FullName;
-            if (repositoriesRoot != null)
-                AddExecutableCandidate(candidates, Path.Combine(repositoriesRoot, "TERM_python", "dist", executableName), root);
+            if (Application.isEditor)
+            {
+                string platformDirectory = Application.platform switch
+                {
+                    RuntimePlatform.WindowsEditor => "Windows-x64",
+                    RuntimePlatform.LinuxEditor => "Linux-x64",
+                    _ => null,
+                };
+
+                return platformDirectory == null
+                    ? null
+                    : Path.Combine(Application.dataPath, "_TERM_", "Editor", "Binaries", platformDirectory, executableName);
+            }
 #endif
-
-            searchedPaths = string.Join("\n", candidates);
-
-            foreach (string candidate in candidates)
-                if (File.Exists(candidate))
-                    return candidate;
-
-            return null;
-        }
-
-        static void AddExecutableCandidate(List<string> candidates, string path, string root)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-                return;
-
-            try
-            {
-                path = Environment.ExpandEnvironmentVariables(path.Trim().Trim('"'));
-                path = Path.IsPathRooted(path) ? Path.GetFullPath(path) : Path.GetFullPath(Path.Combine(root, path));
-
-                if (!candidates.Contains(path))
-                    candidates.Add(path);
-            }
-            catch (Exception)
-            {
-            }
-        }
-
-        static string GetTerminalExecutableName()
-        {
-            switch (Application.platform)
-            {
-                case RuntimePlatform.WindowsEditor:
-                case RuntimePlatform.WindowsPlayer:
-                    return "unity-term.exe";
-
-                case RuntimePlatform.LinuxEditor:
-                case RuntimePlatform.LinuxPlayer:
-                    return "unity-term";
-
-                default:
-                    return null;
-            }
+            return Path.Combine(ArkMachine.DFTools.FullName, executableName);
         }
 
         //----------------------------------------------------------------------------------------------------------
 
         Process StartTerminal(string executable, string title)
         {
-            string clientArguments = BuildClientArguments(title);
+            string clientArguments = $"--host 127.0.0.1 --command-port {port_cmd} --log-port {port_log} --title {QuoteArgument(title)}";
 
             try
             {
@@ -171,11 +140,6 @@ namespace _TERM_
                 Debug.LogException(exception, this);
                 return null;
             }
-        }
-
-        string BuildClientArguments(string title)
-        {
-            return $"--host 127.0.0.1 --command-port {port_cmd} --log-port {port_log} --title {QuoteArgument(title)}";
         }
 
         Process StartLinuxTerminal(string executable, string clientArguments, string title)

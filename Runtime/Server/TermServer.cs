@@ -13,7 +13,6 @@ namespace _TERM_
 
         [Header("External terminal")]
         [SerializeField] KeyCode terminal_key = KeyCode.P;
-        [SerializeField] string terminal_executable = "";
 
         TcpListener cmd_listener, log_listener;
         CancellationTokenSource cancellation;

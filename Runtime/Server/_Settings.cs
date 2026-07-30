@@ -43,7 +43,6 @@ namespace _TERM_
                 [nameof(port_cmd)] = port_cmd,
                 [nameof(port_log)] = port_log,
                 [nameof(terminal_key)] = terminal_key.ToString(),
-                [nameof(terminal_executable)] = terminal_executable,
             };
 
             File.WriteAllText(fpath, JsonConvert.SerializeObject(jobj, Formatting.Indented));
@@ -70,8 +69,6 @@ namespace _TERM_
                 if (jobj.TryGetValue(nameof(terminal_key), out var _terminal_key) &&
                     Enum.TryParse((string)_terminal_key, true, out KeyCode parsed_terminal_key))
                     terminal_key = parsed_terminal_key;
-                if (jobj.TryGetValue(nameof(terminal_executable), out var _terminal_executable))
-                    terminal_executable = (string)_terminal_executable ?? "";
             }
 #if UNITY_EDITOR
             else
