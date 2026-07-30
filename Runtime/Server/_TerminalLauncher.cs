@@ -17,11 +17,13 @@ namespace _TERM_
         {
             public readonly Process process;
             public readonly string title;
+            public readonly uint windowsProcessId;
 
-            public TerminalInstance(Process process, string title)
+            public TerminalInstance(Process process, string title, uint windowsProcessId = 0)
             {
                 this.process = process;
                 this.title = title;
+                this.windowsProcessId = windowsProcessId;
             }
         }
 
@@ -66,9 +68,9 @@ namespace _TERM_
             }
 
             string title = GetTerminalTitle(forceNew);
-            Process process = StartTerminal(executable, title);
-            if (process != null)
-                terminal_instances.Add(new TerminalInstance(process, title));
+            TerminalInstance instance = StartTerminal(executable, title);
+            if (instance != null)
+                terminal_instances.Add(instance);
         }
 
         //----------------------------------------------------------------------------------------------------------
@@ -111,7 +113,7 @@ namespace _TERM_
 
         //----------------------------------------------------------------------------------------------------------
 
-        Process StartTerminal(string executable, string title)
+        TerminalInstance StartTerminal(string executable, string title)
         {
             string clientArguments = $"--host 127.0.0.1 --command-port {port_cmd} --log-port {port_log} --title {QuoteArgument(title)}";
 
@@ -121,11 +123,13 @@ namespace _TERM_
                 {
                     case RuntimePlatform.WindowsEditor:
                     case RuntimePlatform.WindowsPlayer:
-                        return StartWindowsTerminal(executable, clientArguments);
+                        uint processId = StartWindowsTerminal(executable, clientArguments);
+                        return new TerminalInstance(null, title, processId);
 
                     case RuntimePlatform.LinuxEditor:
                     case RuntimePlatform.LinuxPlayer:
-                        return StartLinuxTerminal(executable, clientArguments, title);
+                        Process process = StartLinuxTerminal(executable, clientArguments, title);
+                        return process == null ? null : new TerminalInstance(process, title);
 
                     default:
                         Debug.LogError($"[TERM] Terminal launch is not supported on {Application.platform}.", this);
@@ -139,7 +143,7 @@ namespace _TERM_
             }
         }
 
-        static Process StartWindowsTerminal(string executable, string clientArguments)
+        static uint StartWindowsTerminal(string executable, string clientArguments)
         {
             var startupInfo = new StartupInfo
             {
@@ -168,7 +172,7 @@ namespace _TERM_
 
             try
             {
-                return Process.GetProcessById(checked((int)processInformation.processId));
+                return processInformation.processId;
             }
             finally
             {
@@ -222,8 +226,17 @@ namespace _TERM_
             {
                 TerminalInstance instance = terminal_instances[i];
 
-                if (IsWindows() && FocusWindowsTerminal(instance))
-                    return true;
+                if (IsWindows())
+                {
+                    if (FocusWindowsTerminal(instance))
+                        return true;
+
+                    if (IsWindowsProcessRunning(instance.windowsProcessId))
+                        return true;
+
+                    terminal_instances.RemoveAt(i);
+                    continue;
+                }
 
                 if (IsLinux())
                 {
@@ -266,6 +279,10 @@ namespace _TERM_
             {
                 return false;
             }
+            catch (PlatformNotSupportedException)
+            {
+                return false;
+            }
         }
 
         static bool IsWindows()
@@ -282,26 +299,32 @@ namespace _TERM_
 
         static bool FocusWindowsTerminal(TerminalInstance instance)
         {
-            IntPtr handle = IntPtr.Zero;
-
-            if (IsProcessRunning(instance.process))
-                try
-                {
-                    instance.process.Refresh();
-                    handle = instance.process.MainWindowHandle;
-                }
-                catch (InvalidOperationException)
-                {
-                }
-
-            if (handle == IntPtr.Zero)
-                handle = FindWindow(null, instance.title);
+            IntPtr handle = FindWindow(null, instance.title);
             if (handle == IntPtr.Zero)
                 return false;
 
             ShowWindowAsync(handle, 9);
             SetForegroundWindow(handle);
             return true;
+        }
+
+        static bool IsWindowsProcessRunning(uint processId)
+        {
+            if (processId == 0)
+                return false;
+
+            IntPtr process = OpenProcess(ProcessQueryLimitedInformation, false, processId);
+            if (process == IntPtr.Zero)
+                return false;
+
+            try
+            {
+                return GetExitCodeProcess(process, out uint exitCode) && exitCode == StillActive;
+            }
+            finally
+            {
+                CloseHandle(process);
+            }
         }
 
         static bool FocusLinuxTerminal(string title, out bool focusToolFound)
@@ -364,7 +387,10 @@ namespace _TERM_
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         static extern IntPtr FindWindow(string className, string windowName);
 
-        const uint CreateNewConsole = 0x00000010;
+        const uint
+            CreateNewConsole = 0x00000010,
+            ProcessQueryLimitedInformation = 0x00001000,
+            StillActive = 259;
 
         [StructLayout(LayoutKind.Sequential)]
         struct StartupInfo
@@ -411,6 +437,16 @@ namespace _TERM_
             string currentDirectory,
             ref StartupInfo startupInfo,
             out ProcessInformation processInformation);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern IntPtr OpenProcess(
+            uint desiredAccess,
+            [MarshalAs(UnmanagedType.Bool)] bool inheritHandle,
+            uint processId);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool GetExitCodeProcess(IntPtr process, out uint exitCode);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
