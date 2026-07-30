@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System;
 using System.IO;
 using UnityEngine;
 
@@ -41,6 +42,8 @@ namespace _TERM_
             {
                 [nameof(port_cmd)] = port_cmd,
                 [nameof(port_log)] = port_log,
+                [nameof(terminal_key)] = terminal_key.ToString(),
+                [nameof(terminal_executable)] = terminal_executable,
             };
 
             File.WriteAllText(fpath, JsonConvert.SerializeObject(jobj, Formatting.Indented));
@@ -66,6 +69,11 @@ namespace _TERM_
                     port_cmd = (ushort)_port_cmd;
                 if (jobj.TryGetValue(nameof(port_log), out var _log_port))
                     port_log = (ushort)_log_port;
+                if (jobj.TryGetValue(nameof(terminal_key), out var _terminal_key) &&
+                    Enum.TryParse((string)_terminal_key, true, out KeyCode parsed_terminal_key))
+                    terminal_key = parsed_terminal_key;
+                if (jobj.TryGetValue(nameof(terminal_executable), out var _terminal_executable))
+                    terminal_executable = (string)_terminal_executable ?? "";
             }
         }
     }

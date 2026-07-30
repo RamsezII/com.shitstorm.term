@@ -11,6 +11,10 @@ namespace _TERM_
         [Header("TCP Server")]
         [SerializeField, Range(1, ushort.MaxValue)] ushort port_log = 5051, port_cmd = 5050;
 
+        [Header("External terminal")]
+        [SerializeField] KeyCode terminal_key = KeyCode.P;
+        [SerializeField] string terminal_executable = "";
+
         TcpListener cmd_listener, log_listener;
         CancellationTokenSource cancellation;
 
@@ -49,6 +53,7 @@ namespace _TERM_
         private void Update()
         {
             TickRoutines();
+            TickTerminalLauncher();
         }
 
         [ContextMenu(nameof(StartServer))]
@@ -106,6 +111,7 @@ namespace _TERM_
         void OnDestroy()
         {
             Application.logMessageReceivedThreaded -= OnUnityLog;
+            DisposeTerminalLauncher();
             StopServer();
         }
     }
