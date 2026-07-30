@@ -1,7 +1,10 @@
 {
     "name": "shitstorm._TERM_",
     "rootNamespace": "_TERM_",
-    "references": [],
+    "references": [
+        "GUID:ec96f6dc48fee4244bcebc247464e471",
+        "GUID:2a84e452762c9634994f1da664544658"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
