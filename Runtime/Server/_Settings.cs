@@ -57,9 +57,7 @@ namespace _TERM_
             string rname = typeof(TermServer).FullName + ".json";
             var rtext = Resources.Load<TextAsset>(rname);
 
-            if (rtext == null)
-                SaveSettings();
-            else
+            if (rtext != null)
             {
                 Debug.Log("Loaded text: " + rtext, this);
 
@@ -75,6 +73,10 @@ namespace _TERM_
                 if (jobj.TryGetValue(nameof(terminal_executable), out var _terminal_executable))
                     terminal_executable = (string)_terminal_executable ?? "";
             }
+#if UNITY_EDITOR
+            else
+                SaveSettings();
+#endif
         }
     }
 }
