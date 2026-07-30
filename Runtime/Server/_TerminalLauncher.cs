@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
@@ -120,11 +121,7 @@ namespace _TERM_
                 {
                     case RuntimePlatform.WindowsEditor:
                     case RuntimePlatform.WindowsPlayer:
-                        return Process.Start(new ProcessStartInfo(executable, clientArguments)
-                        {
-                            UseShellExecute = true,
-                            WorkingDirectory = Path.GetDirectoryName(executable),
-                        });
+                        return StartWindowsTerminal(executable, clientArguments);
 
                     case RuntimePlatform.LinuxEditor:
                     case RuntimePlatform.LinuxPlayer:
@@ -139,6 +136,44 @@ namespace _TERM_
             {
                 Debug.LogException(exception, this);
                 return null;
+            }
+        }
+
+        static Process StartWindowsTerminal(string executable, string clientArguments)
+        {
+            var startupInfo = new StartupInfo
+            {
+                size = (uint)Marshal.SizeOf(typeof(StartupInfo)),
+            };
+            var commandLine = new StringBuilder($"{QuoteArgument(executable)} {clientArguments}");
+
+            if (!CreateProcessW(
+                    executable,
+                    commandLine,
+                    IntPtr.Zero,
+                    IntPtr.Zero,
+                    false,
+                    CreateNewConsole,
+                    IntPtr.Zero,
+                    Path.GetDirectoryName(executable),
+                    ref startupInfo,
+                    out ProcessInformation processInformation))
+            {
+                int error = Marshal.GetLastWin32Error();
+                if (error == 0)
+                    throw new InvalidOperationException("[TERM] CreateProcessW failed without a Windows error code.");
+
+                throw new Win32Exception(error);
+            }
+
+            try
+            {
+                return Process.GetProcessById(checked((int)processInformation.processId));
+            }
+            finally
+            {
+                CloseHandle(processInformation.thread);
+                CloseHandle(processInformation.process);
             }
         }
 
@@ -328,5 +363,57 @@ namespace _TERM_
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         static extern IntPtr FindWindow(string className, string windowName);
+
+        const uint CreateNewConsole = 0x00000010;
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct StartupInfo
+        {
+            public uint size;
+            public IntPtr reserved;
+            public IntPtr desktop;
+            public IntPtr title;
+            public uint x;
+            public uint y;
+            public uint xSize;
+            public uint ySize;
+            public uint xCountChars;
+            public uint yCountChars;
+            public uint fillAttribute;
+            public uint flags;
+            public ushort showWindow;
+            public ushort reservedSize;
+            public IntPtr reservedBytes;
+            public IntPtr standardInput;
+            public IntPtr standardOutput;
+            public IntPtr standardError;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct ProcessInformation
+        {
+            public IntPtr process;
+            public IntPtr thread;
+            public uint processId;
+            public uint threadId;
+        }
+
+        [DllImport("kernel32.dll", EntryPoint = "CreateProcessW", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool CreateProcessW(
+            string applicationName,
+            StringBuilder commandLine,
+            IntPtr processAttributes,
+            IntPtr threadAttributes,
+            [MarshalAs(UnmanagedType.Bool)] bool inheritHandles,
+            uint creationFlags,
+            IntPtr environment,
+            string currentDirectory,
+            ref StartupInfo startupInfo,
+            out ProcessInformation processInformation);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool CloseHandle(IntPtr handle);
     }
 }
