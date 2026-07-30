@@ -51,6 +51,12 @@ namespace _TERM_
             if (Application.isBatchMode)
                 return;
 
+            if (cmd_listener == null || log_listener == null || port_cmd == 0 || port_log == 0)
+            {
+                Debug.LogError("[TERM] The server is not ready to accept terminal connections.", this);
+                return;
+            }
+
             if (!forceNew && FocusExistingTerminal())
                 return;
 

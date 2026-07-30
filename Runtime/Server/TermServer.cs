@@ -8,13 +8,11 @@ namespace _TERM_
 {
     public partial class TermServer : MonoBehaviour
     {
-        [Header("TCP Server")]
-        [SerializeField, Range(1, ushort.MaxValue)] ushort port_log = 5051, port_cmd = 5050;
-
         [Header("External terminal")]
         [SerializeField] KeyCode terminal_key = KeyCode.P;
 
         TcpListener cmd_listener, log_listener;
+        int port_cmd, port_log;
         CancellationTokenSource cancellation;
 
         //----------------------------------------------------------------------------------------------------------
@@ -66,13 +64,16 @@ namespace _TERM_
                 cancellation = new CancellationTokenSource();
 
                 // Canal 1 : complétion et exécution des commandes.
-                cmd_listener = new TcpListener(IPAddress.Any, port_cmd);
+                cmd_listener = new TcpListener(IPAddress.Any, 0);
 
                 // Canal 2 : flux indépendant des logs Unity.
-                log_listener = new TcpListener(IPAddress.Any, port_log);
+                log_listener = new TcpListener(IPAddress.Any, 0);
 
                 cmd_listener.Start();
                 log_listener.Start();
+
+                port_cmd = ((IPEndPoint)cmd_listener.LocalEndpoint).Port;
+                port_log = ((IPEndPoint)log_listener.LocalEndpoint).Port;
 
                 _ = AcceptCommandConnectionsAsync(cancellation.Token);
                 _ = AcceptLogConnectionsAsync(cancellation.Token);
@@ -101,6 +102,8 @@ namespace _TERM_
             cancellation = null;
             cmd_listener = null;
             log_listener = null;
+            port_cmd = 0;
+            port_log = 0;
 
             CloseAllConnections();
         }
