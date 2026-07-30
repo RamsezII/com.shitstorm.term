@@ -73,29 +73,32 @@ namespace _TERM_.Tests
 
                     static IEnumerator<CmdStep> EPromptTest(CmdContext context)
                     {
-                        yield return CmdStep.Prompt("Ton nom", CompleteNames);
-                        context.reader.TryRead(out string name);
-
-                        yield return CmdStep.Prompt("Ta couleur préférée", CompleteColors);
-                        context.reader.TryRead(out string color);
-
-                        yield return CmdStep.Result($"Salut {name}, ta couleur préférée est {color}.");
-
-                        static void CompleteNames(CmdReader reader)
+                        yield return CmdStep.Prompt("name: ", static reader =>
                         {
                             reader.TryRead(out _);
-
                             if (reader.IsOnCompletion())
-                                reader.AddCompletions(new[] { "Josué", "Devante", "ShittyG" });
-                        }
+                                reader.AddCompletions(new[] { "Josué", "Devante", "ShittyG", });
+                            else
+                            {
+                                reader.TryRead(out _);
+                                if (reader.IsOnCompletion())
+                                    reader.AddCompletions(new[] { "Jamaguil", "Vinquoas-Copernicus-Cock", });
+                            }
+                        });
 
-                        static void CompleteColors(CmdReader reader)
+                        context.reader.TryRead(out string name1);
+                        context.reader.TryRead(out string name2);
+
+                        yield return CmdStep.Prompt("colors: ", static reader =>
                         {
                             reader.TryRead(out _);
-
                             if (reader.IsOnCompletion())
                                 reader.AddCompletions(new[] { "bleu", "jaune", "rouge", "vert" });
-                        }
+                        });
+
+                        context.reader.TryRead(out string color);
+
+                        yield return CmdStep.Result($"Salut {name1} {name2}, ta couleur préférée est {color}.");
                     }
                 }
             ));

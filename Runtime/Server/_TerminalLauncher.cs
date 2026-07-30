@@ -67,7 +67,7 @@ namespace _TERM_
 
         string GetTerminalTitle(bool forceNew)
         {
-            string title = $"{Application.productName} TERM";
+            string title = $"Terminal for {Application.productName}";
             terminal_sequence++;
             return forceNew ? $"{title} #{terminal_sequence}" : title;
         }
