@@ -33,8 +33,8 @@ namespace _TERM_
         [UnityEditor.MenuItem(prefixe_button_settings + nameof(OpenResources))]
         static void OpenResources() => Application.OpenURL(Directory.GetParent(GetSavePath()).FullName);
 
-        [ContextMenu(nameof(SaveSettings))]
-        void SaveSettings()
+        [ContextMenu(nameof(SaveRSettings))]
+        void SaveRSettings()
         {
             string fpath = GetSavePath();
 
@@ -48,8 +48,8 @@ namespace _TERM_
         }
 #endif
 
-        [ContextMenu(nameof(LoadSettings))]
-        void LoadSettings()
+        [ContextMenu(nameof(LoadRSettings))]
+        void LoadRSettings()
         {
             string rname = typeof(TermServer).FullName + ".json";
             var rtext = Resources.Load<TextAsset>(rname);
@@ -66,7 +66,7 @@ namespace _TERM_
             }
 #if UNITY_EDITOR
             else
-                SaveSettings();
+                SaveRSettings();
 #endif
         }
     }

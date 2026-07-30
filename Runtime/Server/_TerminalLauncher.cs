@@ -93,7 +93,7 @@ namespace _TERM_
             string executableName = Application.platform switch
             {
                 RuntimePlatform.WindowsEditor or RuntimePlatform.WindowsPlayer => "unity-term.exe",
-                RuntimePlatform.LinuxEditor or RuntimePlatform.LinuxPlayer => "unity-term",
+                RuntimePlatform.LinuxEditor or RuntimePlatform.LinuxPlayer => "unity-term.x86_64",
                 _ => null,
             };
             if (executableName == null)

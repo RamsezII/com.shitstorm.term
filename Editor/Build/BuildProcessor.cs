@@ -13,16 +13,22 @@ namespace _TERM_.Editor
         [PostProcessBuild(0)]
         static void CopyTermClient(BuildTarget target, string builtPlayerPath)
         {
-            if (target != BuildTarget.StandaloneWindows64)
+            (string platformDirectory, string executableName) = target switch
+            {
+                BuildTarget.StandaloneWindows64 => ("Windows-x64", "unity-term.exe"),
+                BuildTarget.StandaloneLinux64 => ("Linux-x64", "unity-term.x86_64"),
+                _ => (null, null),
+            };
+
+            if (platformDirectory == null)
                 return;
 
-            const string executableName = "unity-term.exe";
             string source = Path.Combine(
                 Application.dataPath,
                 "_TERM_",
                 "Editor",
                 "Binaries",
-                "Windows-x64",
+                platformDirectory,
                 executableName);
 
             if (!File.Exists(source))
@@ -36,8 +42,26 @@ namespace _TERM_.Editor
             string destination = Path.Combine(toolsDirectory, executableName);
 
             File.Copy(source, destination, overwrite: true);
+            EnsureLinuxExecutable(target, destination);
 
             Debug.Log($"[TERM] Client copié : {destination}");
+        }
+
+        static void EnsureLinuxExecutable(BuildTarget target, string executable)
+        {
+            if (target != BuildTarget.StandaloneLinux64 || Application.platform != RuntimePlatform.LinuxEditor)
+                return;
+
+            string escapedExecutable = executable.Replace("\"", "\\\"");
+            using System.Diagnostics.Process chmod = System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo("chmod", $"+x \"{escapedExecutable}\"")
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                });
+
+            if (chmod == null || !chmod.WaitForExit(5000) || chmod.ExitCode != 0)
+                throw new BuildFailedException($"Impossible de rendre le client TERM exécutable : {executable}");
         }
     }
 }

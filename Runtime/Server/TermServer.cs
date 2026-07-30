@@ -40,7 +40,7 @@ namespace _TERM_
 
         void Start()
         {
-            LoadSettings();
+            LoadRSettings();
             Application.logMessageReceivedThreaded += OnUnityLog;
             StartServer();
         }
@@ -112,6 +112,9 @@ namespace _TERM_
 
         void OnDestroy()
         {
+#if UNITY_EDITOR
+            SaveRSettings();
+#endif
             Application.logMessageReceivedThreaded -= OnUnityLog;
             DisposeTerminalLauncher();
             StopServer();
