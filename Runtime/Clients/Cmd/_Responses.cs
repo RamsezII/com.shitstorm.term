@@ -68,7 +68,7 @@ namespace _TERM_
 
         internal sealed class CmdResponse_completions : CmdResponse
         {
-            public int start, end;
+            public int start;
             public IList<string> candidates;
 
             //----------------------------------------------------------------------------------------------------------
@@ -76,7 +76,6 @@ namespace _TERM_
             internal CmdResponse_completions(in CmdReader reader) : base(RespTypes.completion)
             {
                 start = reader.compl_start;
-                end = reader.compl_end;
                 candidates = reader.compl_candidates;
             }
         }

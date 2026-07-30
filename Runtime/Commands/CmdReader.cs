@@ -16,7 +16,7 @@ namespace _TERM_
         public readonly string line;
         public readonly int cursor;
         int start_i, read_i;
-        internal int compl_start, compl_end;
+        internal int compl_start;
         internal readonly List<string> compl_candidates;
         readonly StringBuilder error_sb;
         public bool HasError => error_sb.Length > 0;
@@ -32,7 +32,6 @@ namespace _TERM_
             start_i = 0;
             read_i = 0;
             compl_start = 0;
-            compl_end = this.line.Length;
             compl_candidates = new List<string>();
             error_sb = new();
 
@@ -113,7 +112,6 @@ namespace _TERM_
                 if (start_i <= cursor && cursor <= read_i)
                 {
                     compl_start = start_i;
-                    compl_end = read_i;
                     return true;
                 }
             return false;
