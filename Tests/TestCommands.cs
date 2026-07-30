@@ -10,33 +10,33 @@ namespace _TERM_.Tests
         {
             TermServer.root_commands.AddCommandNode(new CmdCommand(
                 name: "echo",
-                args: static (reader, handler) =>
+                parse: static (reader, context) =>
                 {
                     if (reader.TryRead(out string output))
-                        handler.args.Add(output);
+                        context.args.Add(output);
                     else
                         reader.WriteError($"expected argument");
                 },
-                action1: static handler =>
+                execute: static context =>
                 {
-                    return (string)handler.args[0];
+                    return (string)context.args[0];
                 }
             ));
 
             TermServer.root_commands.AddCommandNode(new CmdCommand(
                 name: "wait_seconds",
-                args: static (reader, handler) =>
+                parse: static (reader, context) =>
                 {
                     if (reader.TryRead(out string output) && float.TryParse(output, out float seconds))
-                        handler.args.Add(seconds);
+                        context.args.Add(seconds);
                     else
-                        handler.args.Add(0);
+                        context.args.Add(0);
                 },
-                routine2: static (handler, hreader) =>
+                routine: static context =>
                 {
-                    float seconds = (float)handler.args[0];
+                    float seconds = (float)context.args[0];
                     return EWait(seconds);
-                    static IEnumerator<CmdCommand.RoutineStatus> EWait(float seconds)
+                    static IEnumerator<CmdStep> EWait(float seconds)
                     {
                         float timer = 0;
                         while (timer < seconds)
@@ -50,10 +50,10 @@ namespace _TERM_.Tests
 
             TermServer.root_commands.AddCommandNode(new CmdCommand(
                 name: "wait_1second",
-                routine2: static (handler, hreader) =>
+                routine: static context =>
                 {
                     return EWait();
-                    static IEnumerator<CmdCommand.RoutineStatus> EWait()
+                    static IEnumerator<CmdStep> EWait()
                     {
                         float timer = 0;
                         while (timer < 1)
@@ -67,25 +67,35 @@ namespace _TERM_.Tests
 
             TermServer.root_commands.AddCommandNode(new CmdCommand(
                 name: "prompt_test",
-                routine2: static (handler, hreader) =>
+                routine: static context =>
                 {
-                    return EPromptTest(hreader);
-                    static IEnumerator<CmdCommand.RoutineStatus> EPromptTest(ReadHandler hreader)
-                    {
-                        yield return new(prompt: "Ton nom", progress: 0, result: null);
-                        hreader._reader.TryRead(out string name);
+                    return EPromptTest(context);
 
-                        if (hreader._reader.IsOnCompletion())
+                    static IEnumerator<CmdStep> EPromptTest(CmdContext context)
+                    {
+                        yield return CmdStep.Prompt("Ton nom", CompleteNames);
+                        context.reader.TryRead(out string name);
+
+                        yield return CmdStep.Prompt("Ta couleur préférée", CompleteColors);
+                        context.reader.TryRead(out string color);
+
+                        yield return CmdStep.Result($"Salut {name}, ta couleur préférée est {color}.");
+
+                        static void CompleteNames(CmdReader reader)
                         {
-                            hreader._reader.compl_candidates.Add("Josué");
-                            hreader._reader.compl_candidates.Add("Devante");
-                            hreader._reader.compl_candidates.Add("ShittyG");
+                            reader.TryRead(out _);
+
+                            if (reader.IsOnCompletion())
+                                reader.AddCompletions(new[] { "Josué", "Devante", "ShittyG" });
                         }
 
-                        yield return new(prompt: "Ta couleur préférée", progress: 0.5f, result: null);
-                        hreader._reader.TryRead(out string color);
+                        static void CompleteColors(CmdReader reader)
+                        {
+                            reader.TryRead(out _);
 
-                        yield return new(prompt: null, progress: 1, result: $"Salut {name}, ta couleur préférée est {color}.");
+                            if (reader.IsOnCompletion())
+                                reader.AddCompletions(new[] { "bleu", "jaune", "rouge", "vert" });
+                        }
                     }
                 }
             ));
@@ -96,14 +106,14 @@ namespace _TERM_.Tests
             ns.AddCommandNode(ns = new("ns3"));
             ns.AddCommandNode(new CmdCommand(
                 name: "test",
-                args: static (reader, handler) =>
+                parse: static (reader, context) =>
                 {
                     reader.TryRead(out string output);
-                    handler.args.Add(output);
+                    context.args.Add(output);
                 },
-                action1: static handler =>
+                execute: static context =>
                 {
-                    return (string)handler.args[0];
+                    return (string)context.args[0];
                 }
             ));
         }

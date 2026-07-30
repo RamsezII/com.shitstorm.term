@@ -50,6 +50,9 @@ namespace _TERM_
             {
                 await connection.ASend(new CmdClient.CmdResponse_intro());
 
+                lock (routines)
+                    routines.Add(ECommandSession(connection));
+
                 while (!token.IsCancellationRequested)
                 {
                     string rawtext = await connection.reader.ReadLineAsync();
@@ -58,16 +61,11 @@ namespace _TERM_
 
                     if (!CmdClient.CmdRequest.TryDeserialize(rawtext, out var request, out string error))
                     {
-                        connection.ClosePromptInput();
-                        await connection.ASend(new CmdClient.CmdResponse_error(error));
+                        connection.Enqueue(CmdClient.CmdRequest.Invalid(error));
                         continue;
                     }
 
-                    if (connection.TryDeliverPromptInput(request))
-                        continue;
-
-                    lock (routines)
-                        routines.Add(EOnIncomingCommand(connection, request));
+                    connection.Enqueue(request);
                 }
             }
             catch (Exception exception) when (
@@ -84,7 +82,7 @@ namespace _TERM_
             }
             finally
             {
-                connection.ClosePromptInput();
+                connection.CloseRequests();
 
                 lock (cmd_connections)
                     cmd_connections.Remove(connection);
@@ -99,8 +97,11 @@ namespace _TERM_
         {
             lock (cmd_connections)
             {
-                foreach (TermClient connection in cmd_connections)
+                foreach (CmdClient connection in cmd_connections)
+                {
+                    connection.CloseRequests();
                     connection.Dispose();
+                }
                 cmd_connections.Clear();
             }
 

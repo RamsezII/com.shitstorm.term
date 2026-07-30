@@ -2,7 +2,9 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace _TERM_
@@ -11,7 +13,7 @@ namespace _TERM_
     {
         internal sealed class CmdRequest
         {
-            internal readonly string type, cmdline;
+            internal readonly string type, cmdline, error;
             internal readonly int cursor;
 
             //----------------------------------------------------------------------------------------------------------
@@ -21,7 +23,18 @@ namespace _TERM_
                 this.type = type;
                 this.cmdline = cmdline;
                 this.cursor = cursor;
+                error = null;
             }
+
+            CmdRequest(in string error)
+            {
+                type = null;
+                cmdline = string.Empty;
+                cursor = 0;
+                this.error = error;
+            }
+
+            internal static CmdRequest Invalid(in string error) => new(error);
 
             internal static bool TryDeserialize(in string rawtext, out CmdRequest request, out string error)
             {
@@ -39,11 +52,10 @@ namespace _TERM_
                     else if (string.IsNullOrWhiteSpace((string)type))
                         error = "empty request type";
                     else
-                        request = new(
-                            type: (string)type,
-                            cmdline: (string)json["cmdline"] ?? string.Empty,
-                            cursor: json.TryGetValue("cursor", out var cursor) ? (int)cursor : 0
-                        );
+                    {
+                        json.TryGetValue("cmdline", StringComparison.OrdinalIgnoreCase, out var cmdline);
+                        request = new(type: (string)type, cmdline: (string)cmdline ?? string.Empty, cursor: json.TryGetValue("cursor", StringComparison.OrdinalIgnoreCase, out var cursor) ? (int)cursor : 0);
+                    }
                 }
                 catch (Exception e) when (
                     e is JsonException ||
@@ -58,8 +70,9 @@ namespace _TERM_
             }
         }
 
-        readonly object prompt_input_lock = new();
-        TaskCompletionSource<CmdRequest> prompt_input;
+        readonly ConcurrentQueue<CmdRequest> requests = new();
+        int closed;
+        internal bool IsClosed => Volatile.Read(ref closed) != 0;
 
         //----------------------------------------------------------------------------------------------------------
 
@@ -69,46 +82,9 @@ namespace _TERM_
 
         //----------------------------------------------------------------------------------------------------------
 
-        internal Task<CmdRequest> WaitForPromptInputAsync()
-        {
-            lock (prompt_input_lock)
-            {
-                if (prompt_input != null)
-                    throw new InvalidOperationException("This command is already waiting for prompt input.");
-
-                prompt_input = new(TaskCreationOptions.RunContinuationsAsynchronously);
-                return prompt_input.Task;
-            }
-        }
-
-        internal bool TryDeliverPromptInput(CmdRequest request)
-        {
-            TaskCompletionSource<CmdRequest> input;
-
-            lock (prompt_input_lock)
-            {
-                if (prompt_input == null)
-                    return false;
-
-                input = prompt_input;
-                prompt_input = null;
-            }
-
-            return input.TrySetResult(request);
-        }
-
-        internal void ClosePromptInput()
-        {
-            TaskCompletionSource<CmdRequest> input;
-
-            lock (prompt_input_lock)
-            {
-                input = prompt_input;
-                prompt_input = null;
-            }
-
-            input?.TrySetResult(null);
-        }
+        internal void Enqueue(CmdRequest request) => requests.Enqueue(request);
+        internal bool TryDequeue(out CmdRequest request) => requests.TryDequeue(out request);
+        internal void CloseRequests() => Interlocked.Exchange(ref closed, 1);
 
         //----------------------------------------------------------------------------------------------------------
 

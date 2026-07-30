@@ -13,6 +13,8 @@ namespace _TERM_
             exception,
             completion,
             prompt,
+            status,
+            cancelled,
             result,
         }
 
@@ -88,6 +90,27 @@ namespace _TERM_
             internal CmdResponse_prompt(in string prompt) : base(RespTypes.prompt)
             {
                 this.prompt = prompt;
+            }
+        }
+
+        internal sealed class CmdResponse_status : CmdResponse
+        {
+            public string message;
+            public float progress;
+
+            //----------------------------------------------------------------------------------------------------------
+
+            internal CmdResponse_status(in string message, in float progress) : base(RespTypes.status)
+            {
+                this.message = message;
+                this.progress = progress;
+            }
+        }
+
+        internal sealed class CmdResponse_cancelled : CmdResponse
+        {
+            internal CmdResponse_cancelled() : base(RespTypes.cancelled)
+            {
             }
         }
 
