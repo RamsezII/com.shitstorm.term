@@ -190,8 +190,12 @@ namespace _TERM_
         Process StartLinuxTerminal(string executable, string clientArguments, string title)
         {
             string command = $"{QuoteArgument(executable)} {clientArguments}";
+            string workingDirectory = Path.GetDirectoryName(executable);
             var launchers = new (string executable, string arguments)[]
             {
+                ("xdg-terminal-exec", $"--title={QuoteArgument(title)} --dir={QuoteArgument(workingDirectory)} -- {command}"),
+                ("ptyxis", $"--new-window --title={QuoteArgument(title)} --working-directory={QuoteArgument(workingDirectory)} -- {command}"),
+                ("kgx", $"--title={QuoteArgument(title)} --working-directory={QuoteArgument(workingDirectory)} -- {command}"),
                 ("x-terminal-emulator", $"-T {QuoteArgument(title)} -e {command}"),
                 ("gnome-terminal", $"--wait --title {QuoteArgument(title)} -- {command}"),
                 ("konsole", $"--separate -p {QuoteArgument($"tabtitle={title}")} -e {command}"),
@@ -200,22 +204,39 @@ namespace _TERM_
                 ("alacritty", $"--title {QuoteArgument(title)} -e {command}"),
                 ("xterm", $"-T {QuoteArgument(title)} -e {command}"),
             };
+            var failures = new List<string>();
 
             foreach ((string launcher, string arguments) in launchers)
                 try
                 {
-                    return Process.Start(new ProcessStartInfo(launcher, arguments)
+                    Process process = Process.Start(new ProcessStartInfo(launcher, arguments)
                     {
                         UseShellExecute = false,
                         CreateNoWindow = true,
-                        WorkingDirectory = Path.GetDirectoryName(executable),
+                        WorkingDirectory = workingDirectory,
                     });
+
+                    if (process == null)
+                    {
+                        failures.Add($"{launcher}: no process returned");
+                        continue;
+                    }
+
+                    if (process.WaitForExit(250) && process.ExitCode != 0)
+                    {
+                        failures.Add($"{launcher}: exit code {process.ExitCode}");
+                        process.Dispose();
+                        continue;
+                    }
+
+                    return process;
                 }
-                catch (Win32Exception)
+                catch (Win32Exception exception)
                 {
+                    failures.Add($"{launcher}: {exception.Message}");
                 }
 
-            Debug.LogError("[TERM] No supported terminal emulator found.", this);
+            Debug.LogError($"[TERM] No supported terminal emulator found. {string.Join("; ", failures)}", this);
             return null;
         }
 
