@@ -2,7 +2,6 @@ using _ARK_;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -15,15 +14,15 @@ namespace _TERM_
     {
         sealed class TerminalInstance
         {
-            public readonly Process process;
             public readonly string title;
             public readonly uint windowsProcessId;
+            public readonly int linuxProcessId;
 
-            public TerminalInstance(Process process, string title, uint windowsProcessId = 0)
+            public TerminalInstance(string title, uint windowsProcessId = 0, int linuxProcessId = 0)
             {
-                this.process = process;
                 this.title = title;
                 this.windowsProcessId = windowsProcessId;
+                this.linuxProcessId = linuxProcessId;
             }
         }
 
@@ -130,12 +129,12 @@ namespace _TERM_
                     case RuntimePlatform.WindowsEditor:
                     case RuntimePlatform.WindowsPlayer:
                         uint processId = StartWindowsTerminal(executable, clientArguments);
-                        return new TerminalInstance(null, title, processId);
+                        return new TerminalInstance(title, windowsProcessId: processId);
 
                     case RuntimePlatform.LinuxEditor:
                     case RuntimePlatform.LinuxPlayer:
-                        Process process = StartLinuxTerminal(executable, clientArguments, title);
-                        return process == null ? null : new TerminalInstance(process, title);
+                        int linuxProcessId = StartLinuxTerminal(executable, title);
+                        return linuxProcessId <= 0 ? null : new TerminalInstance(title, linuxProcessId: linuxProcessId);
 
                     default:
                         Debug.LogError($"[TERM] Terminal launch is not supported on {Application.platform}.", this);
@@ -187,57 +186,38 @@ namespace _TERM_
             }
         }
 
-        Process StartLinuxTerminal(string executable, string clientArguments, string title)
+        int StartLinuxTerminal(string executable, string title)
         {
-            string command = $"{QuoteArgument(executable)} {clientArguments}";
             string workingDirectory = Path.GetDirectoryName(executable);
-            var launchers = new (string executable, string arguments)[]
+            string[] clientArguments =
             {
-                ("xdg-terminal-exec", $"--title={QuoteArgument(title)} --dir={QuoteArgument(workingDirectory)} -- {command}"),
-                ("ptyxis", $"--new-window --title={QuoteArgument(title)} --working-directory={QuoteArgument(workingDirectory)} -- {command}"),
-                ("kgx", $"--title={QuoteArgument(title)} --working-directory={QuoteArgument(workingDirectory)} -- {command}"),
-                ("x-terminal-emulator", $"-T {QuoteArgument(title)} -e {command}"),
-                ("gnome-terminal", $"--wait --title {QuoteArgument(title)} -- {command}"),
-                ("konsole", $"--separate -p {QuoteArgument($"tabtitle={title}")} -e {command}"),
-                ("xfce4-terminal", $"--disable-server --title {QuoteArgument(title)} --execute {command}"),
-                ("kitty", $"--title {QuoteArgument(title)} {command}"),
-                ("alacritty", $"--title {QuoteArgument(title)} -e {command}"),
-                ("xterm", $"-T {QuoteArgument(title)} -e {command}"),
+                executable,
+                "--host",
+                "127.0.0.1",
+                "--command-port",
+                port_cmd.ToString(),
+                "--log-port",
+                port_log.ToString(),
+                "--title",
+                title,
             };
-            var failures = new List<string>();
 
-            foreach ((string launcher, string arguments) in launchers)
-                try
-                {
-                    Process process = Process.Start(new ProcessStartInfo(launcher, arguments)
-                    {
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        WorkingDirectory = workingDirectory,
-                    });
+            if (File.Exists(XdgTerminalExec))
+                return StartLinuxProcess(
+                    XdgTerminalExec,
+                    CombineArguments(
+                        new[] { $"--title={title}", $"--dir={workingDirectory}", "--" },
+                        clientArguments),
+                    createSession: true);
 
-                    if (process == null)
-                    {
-                        failures.Add($"{launcher}: no process returned");
-                        continue;
-                    }
+            if (File.Exists(XTerminalEmulator))
+                return StartLinuxProcess(
+                    XTerminalEmulator,
+                    CombineArguments(new[] { "-T", title, "-e" }, clientArguments),
+                    createSession: true);
 
-                    if (process.WaitForExit(250) && process.ExitCode != 0)
-                    {
-                        failures.Add($"{launcher}: exit code {process.ExitCode}");
-                        process.Dispose();
-                        continue;
-                    }
-
-                    return process;
-                }
-                catch (Win32Exception exception)
-                {
-                    failures.Add($"{launcher}: {exception.Message}");
-                }
-
-            Debug.LogError($"[TERM] No supported terminal emulator found. {string.Join("; ", failures)}", this);
-            return null;
+            Debug.LogError("[TERM] Ubuntu terminal launcher not found. Install xdg-terminal-exec.", this);
+            return 0;
         }
 
         static string QuoteArgument(string value)
@@ -270,7 +250,7 @@ namespace _TERM_
                     if (FocusLinuxTerminal(instance.title, out bool focusToolFound))
                         return true;
 
-                    if (IsProcessRunning(instance.process))
+                    if (IsLinuxProcessRunning(instance.linuxProcessId))
                     {
                         if (!warned_about_linux_focus)
                         {
@@ -281,35 +261,15 @@ namespace _TERM_
 
                         return true;
                     }
+
+                    terminal_instances.RemoveAt(i);
+                    continue;
                 }
 
-                if (!IsProcessRunning(instance.process))
-                {
-                    instance.process?.Dispose();
-                    terminal_instances.RemoveAt(i);
-                }
+                terminal_instances.RemoveAt(i);
             }
 
             return false;
-        }
-
-        static bool IsProcessRunning(Process process)
-        {
-            if (process == null)
-                return false;
-
-            try
-            {
-                return !process.HasExited;
-            }
-            catch (InvalidOperationException)
-            {
-                return false;
-            }
-            catch (PlatformNotSupportedException)
-            {
-                return false;
-            }
         }
 
         static bool IsWindows()
@@ -358,52 +318,126 @@ namespace _TERM_
         {
             focusToolFound = false;
 
-            if (RunFocusCommand("wmctrl", $"-a {QuoteArgument(title)}", out bool wmctrlFound))
+            if (RunFocusCommand(Wmctrl, new[] { "-a", title }, out bool wmctrlFound))
                 return true;
             focusToolFound |= wmctrlFound;
 
-            if (RunFocusCommand("xdotool", $"search --name {QuoteArgument(title)} windowactivate", out bool xdotoolFound))
+            if (RunFocusCommand(Xdotool, new[] { "search", "--name", title, "windowactivate" }, out bool xdotoolFound))
                 return true;
             focusToolFound |= xdotoolFound;
 
             return false;
         }
 
-        static bool RunFocusCommand(string executable, string arguments, out bool executableFound)
+        static bool RunFocusCommand(string executable, string[] arguments, out bool executableFound)
         {
-            executableFound = false;
+            executableFound = File.Exists(executable);
+            if (!executableFound)
+                return false;
 
             try
             {
-                using Process process = Process.Start(new ProcessStartInfo(executable, arguments)
-                {
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                });
-
-                executableFound = process != null;
-                return process != null && process.WaitForExit(500) && process.ExitCode == 0;
+                int processId = StartLinuxProcess(executable, arguments, createSession: false);
+                return WaitPid(processId, out int status, 0) == processId
+                    && (status & 0x7f) == 0
+                    && ((status >> 8) & 0xff) == 0;
             }
             catch (Win32Exception)
             {
                 return false;
             }
-            catch (InvalidOperationException)
+        }
+
+        static bool IsLinuxProcessRunning(int processId)
+        {
+            return processId > 0 && WaitPid(processId, out _, WaitNoHang) == 0;
+        }
+
+        static int StartLinuxProcess(string executable, string[] arguments, bool createSession)
+        {
+            var nativeStrings = new IntPtr[arguments.Length + 1];
+            IntPtr nativeArguments = IntPtr.Zero;
+            int processId = -1;
+
+            try
             {
-                executableFound = true;
-                return false;
+                nativeStrings[0] = Marshal.StringToHGlobalAnsi(executable);
+                for (int i = 0; i < arguments.Length; i++)
+                    nativeStrings[i + 1] = Marshal.StringToHGlobalAnsi(arguments[i]);
+
+                nativeArguments = Marshal.AllocHGlobal((nativeStrings.Length + 1) * IntPtr.Size);
+                for (int i = 0; i < nativeStrings.Length; i++)
+                    Marshal.WriteIntPtr(nativeArguments, i * IntPtr.Size, nativeStrings[i]);
+                Marshal.WriteIntPtr(nativeArguments, nativeStrings.Length * IntPtr.Size, IntPtr.Zero);
+
+                processId = Fork();
+                if (processId == 0)
+                {
+                    if (createSession)
+                        CreateSession();
+
+                    ExecV(nativeStrings[0], nativeArguments);
+                    LinuxExit(127);
+                    return 0;
+                }
+
+                if (processId < 0)
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+
+                return processId;
             }
+            finally
+            {
+                if (processId != 0)
+                {
+                    if (nativeArguments != IntPtr.Zero)
+                        Marshal.FreeHGlobal(nativeArguments);
+
+                    foreach (IntPtr nativeString in nativeStrings)
+                        if (nativeString != IntPtr.Zero)
+                            Marshal.FreeHGlobal(nativeString);
+                }
+            }
+        }
+
+        static string[] CombineArguments(string[] prefix, string[] arguments)
+        {
+            var result = new string[prefix.Length + arguments.Length];
+            Array.Copy(prefix, 0, result, 0, prefix.Length);
+            Array.Copy(arguments, 0, result, prefix.Length, arguments.Length);
+            return result;
         }
 
         //----------------------------------------------------------------------------------------------------------
 
         void DisposeTerminalLauncher()
         {
-            foreach (TerminalInstance instance in terminal_instances)
-                instance.process?.Dispose();
-
             terminal_instances.Clear();
         }
+
+        const string
+            LinuxLib = "libc.so.6",
+            XdgTerminalExec = "/usr/bin/xdg-terminal-exec",
+            XTerminalEmulator = "/usr/bin/x-terminal-emulator",
+            Wmctrl = "/usr/bin/wmctrl",
+            Xdotool = "/usr/bin/xdotool";
+
+        const int WaitNoHang = 1;
+
+        [DllImport(LinuxLib, EntryPoint = "fork", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
+        static extern int Fork();
+
+        [DllImport(LinuxLib, EntryPoint = "setsid", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
+        static extern int CreateSession();
+
+        [DllImport(LinuxLib, EntryPoint = "execv", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
+        static extern int ExecV(IntPtr path, IntPtr arguments);
+
+        [DllImport(LinuxLib, EntryPoint = "_exit", CallingConvention = CallingConvention.Cdecl)]
+        static extern void LinuxExit(int status);
+
+        [DllImport(LinuxLib, EntryPoint = "waitpid", CallingConvention = CallingConvention.Cdecl, SetLastError = true)]
+        static extern int WaitPid(int processId, out int status, int options);
 
         [DllImport("user32.dll")]
         static extern bool SetForegroundWindow(IntPtr window);
