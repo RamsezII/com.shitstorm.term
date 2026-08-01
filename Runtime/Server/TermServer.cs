@@ -10,9 +10,10 @@ namespace _TERM_
     {
         [Header("External terminal")]
         [SerializeField] KeyCode terminal_key = KeyCode.P;
+        [SerializeField, Range(0, ushort.MaxValue)] ushort port_cmd_override, port_log_override;
 
         TcpListener cmd_listener, log_listener;
-        int port_cmd, port_log;
+        [SerializeField, Range(0, ushort.MaxValue)] int port_cmd, port_log;
         CancellationTokenSource cancellation;
 
         //----------------------------------------------------------------------------------------------------------
@@ -41,11 +42,20 @@ namespace _TERM_
         void Start()
         {
             LoadRSettings();
+            LoadHSettings();
             Application.logMessageReceivedThreaded += OnUnityLog;
             StartServer();
         }
 
         //----------------------------------------------------------------------------------------------------------
+
+        private void OnApplicationFocus(bool focus)
+        {
+            if (focus)
+                LoadHSettings();
+            else
+                SaveHSettings();
+        }
 
         private void Update()
         {
@@ -64,10 +74,10 @@ namespace _TERM_
                 cancellation = new CancellationTokenSource();
 
                 // Canal 1 : complétion et exécution des commandes.
-                cmd_listener = new TcpListener(IPAddress.Any, 0);
+                cmd_listener = new TcpListener(IPAddress.Any, port_cmd_override);
 
                 // Canal 2 : flux indépendant des logs Unity.
-                log_listener = new TcpListener(IPAddress.Any, 0);
+                log_listener = new TcpListener(IPAddress.Any, port_log_override);
 
                 cmd_listener.Start();
                 log_listener.Start();
@@ -115,6 +125,7 @@ namespace _TERM_
 #if UNITY_EDITOR
             SaveRSettings();
 #endif
+            SaveHSettings();
             Application.logMessageReceivedThreaded -= OnUnityLog;
             DisposeTerminalLauncher();
             StopServer();

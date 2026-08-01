@@ -9,13 +9,13 @@ namespace _TERM_
     partial class TermServer
     {
 #if UNITY_EDITOR
-        const string prefixe_button_settings = "Assets/" + nameof(_TERM_) + "/" + nameof(TermServer) + ".";
+        const string prefixe_button_rsettings = "Assets/" + nameof(_TERM_) + "/" + nameof(TermServer) + ".";
 #endif
 
         //----------------------------------------------------------------------------------------------------------
 
 #if UNITY_EDITOR
-        static string GetSavePath()
+        static string GetRSavePath()
         {
             string fname = typeof(TermServer).FullName + ".json.txt";
             string dpath = Path.Combine(Application.dataPath, "Resources");
@@ -27,16 +27,16 @@ namespace _TERM_
             return fpath;
         }
 
-        [UnityEditor.MenuItem(prefixe_button_settings + nameof(OpenSettings))]
-        static void OpenSettings() => Application.OpenURL(GetSavePath());
+        [UnityEditor.MenuItem(prefixe_button_rsettings + nameof(OpenRSettings))]
+        static void OpenRSettings() => Application.OpenURL(GetRSavePath());
 
-        [UnityEditor.MenuItem(prefixe_button_settings + nameof(OpenResources))]
-        static void OpenResources() => Application.OpenURL(Directory.GetParent(GetSavePath()).FullName);
+        [UnityEditor.MenuItem(prefixe_button_rsettings + nameof(OpenResources))]
+        static void OpenResources() => Application.OpenURL(Directory.GetParent(GetRSavePath()).FullName);
 
         [ContextMenu(nameof(SaveRSettings))]
         void SaveRSettings()
         {
-            string fpath = GetSavePath();
+            string fpath = GetRSavePath();
 
             var jobj = new JObject
             {
