@@ -52,9 +52,9 @@ namespace _TERM_
         private void OnApplicationFocus(bool focus)
         {
             if (focus)
-                LoadHSettings();
+                LoadHSettings(log: false);
             else
-                SaveHSettings();
+                SaveHSettings(log: false);
         }
 
         private void Update()

@@ -7,13 +7,13 @@ namespace _TERM_
 {
     partial class TermServer
     {
-        static string GetHSettingsPath() => Path.Combine(ArkMachine.DFHome.FullName, typeof(TermServer).GetJSonExtension());
+        static string GetHSettingsPath() => Path.Combine(ArkMachine.DFHome.FullName, typeof(TermServer).GetJSonFileName());
 
         //----------------------------------------------------------------------------------------------------------
 
         [ContextMenu(nameof(SaveHSettings))]
-        void SaveHSettings() => SaveHSettings_log(log: true);
-        void SaveHSettings_log(in bool log)
+        void SaveHSettings() => SaveHSettings(log: true);
+        void SaveHSettings(in bool log)
         {
             string fpath = GetHSettingsPath();
 
@@ -27,8 +27,8 @@ namespace _TERM_
         }
 
         [ContextMenu(nameof(LoadHSettings))]
-        void LoadHSettings() => LoadHSettings_log(log: true);
-        void LoadHSettings_log(in bool log)
+        void LoadHSettings() => LoadHSettings(log: true);
+        void LoadHSettings(in bool log)
         {
             string fpath = GetHSettingsPath();
 
