@@ -35,11 +35,9 @@ namespace _TERM_
         void TickTerminalLauncher()
         {
 #if ENABLE_LEGACY_INPUT_MANAGER
-            if (Application.isBatchMode || !Input.GetKeyDown(terminal_key))
-                return;
-
-            bool forceNew = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-            OpenTerminal(forceNew);
+            if (Input.GetKeyDown(terminal_key))
+                if (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt) || !UsageManager.AllAreEmpty(UsageGroups.Typing))
+                    OpenTerminal(forceNew: Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
 #endif
         }
 
