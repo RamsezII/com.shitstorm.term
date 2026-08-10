@@ -17,8 +17,6 @@ namespace _TERM_
         [SerializeField, Range(0, ushort.MaxValue)] int port_cmd, port_log;
         CancellationTokenSource cancellation;
 
-        RuntimeInfo runtimeInfo;
-
         //----------------------------------------------------------------------------------------------------------
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -35,20 +33,22 @@ namespace _TERM_
 
         //----------------------------------------------------------------------------------------------------------
 
-        void Awake()
+        private void Awake()
         {
+            Application.logMessageReceivedThreaded += OnUnityLog;
             DontDestroyOnLoad(gameObject);
         }
 
         //----------------------------------------------------------------------------------------------------------
 
-        void Start()
+        private void Start()
         {
             LoadRSettings();
             LoadHSettings();
-            Application.logMessageReceivedThreaded += OnUnityLog;
             StartServer();
-            runtimeInfo = new(new($"{GetType()} {{ {nameof(port_cmd)}: {port_cmd}, {nameof(port_log)}: {port_log}, }}"));
+#if HAS_SGUI
+            InitSguiRuntimeSettings();
+#endif
             NUCLEOR.delegates.OnApplicationFocus += () => LoadHSettings(log: false);
             NUCLEOR.delegates.OnApplicationUnfocus += () => SaveHSettings(log: false);
         }
@@ -127,7 +127,10 @@ namespace _TERM_
             Application.logMessageReceivedThreaded -= OnUnityLog;
             DisposeTerminalLauncher();
             StopServer();
-            runtimeInfo.Dispose();
+
+#if HAS_SGUI
+            _SGUI_.OSView.onRuntimeSettingsPrompt.Remove(this);
+#endif
         }
     }
 }

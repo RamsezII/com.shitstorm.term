@@ -3,7 +3,9 @@
     "rootNamespace": "_TERM_",
     "references": [
         "GUID:ec96f6dc48fee4244bcebc247464e471",
-        "GUID:2a84e452762c9634994f1da664544658"
+        "GUID:2a84e452762c9634994f1da664544658",
+        "GUID:84fa75d71d64bc04e87c47a81fe0ee9c",
+        "GUID:6055be8ebefd69e48b49212b09b47b2f"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -12,6 +14,17 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.ram16.sgui",
+            "expression": "",
+            "define": "HAS_SGUI"
+        },
+        {
+            "name": "Unity.TextMeshPro",
+            "expression": "",
+            "define": "HAS_TMPro"
+        }
+    ],
     "noEngineReferences": false
 }
