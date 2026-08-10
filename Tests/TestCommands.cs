@@ -77,26 +77,26 @@ namespace _TERM_.Tests
                         {
                             reader.TryRead(out _);
                             if (reader.IsOnCompletion())
-                                reader.AddCompletions(new[] { "Josué", "Devante", "ShittyG", });
+                                reader.AddCompletions((IEnumerable<string>)(new[] { "Josué", "Devante", "ShittyG", }));
                             else
                             {
                                 reader.TryRead(out _);
                                 if (reader.IsOnCompletion())
-                                    reader.AddCompletions(new[] { "Jamaguil", "Vinquoas-Copernicus-Cock", });
+                                    reader.AddCompletions((IEnumerable<string>)(new[] { "Jamaguil", "Vinquoas-Copernicus-Cock", }));
                             }
                         });
 
-                        context.reader.TryRead(out string name1);
-                        context.reader.TryRead(out string name2);
+                        context.Reader.TryRead(out string name1);
+                        context.Reader.TryRead(out string name2);
 
                         yield return CmdStep.Prompt("colors: ", static reader =>
                         {
                             reader.TryRead(out _);
                             if (reader.IsOnCompletion())
-                                reader.AddCompletions(new[] { "bleu", "jaune", "rouge", "vert" });
+                                reader.AddCompletions((IEnumerable<string>)(new[] { "bleu", "jaune", "rouge", "vert" }));
                         });
 
-                        context.reader.TryRead(out string color);
+                        context.Reader.TryRead(out string color);
 
                         yield return CmdStep.Result($"Salut {name1} {name2}, ta couleur préférée est {color}.");
                     }

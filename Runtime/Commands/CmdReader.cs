@@ -91,19 +91,15 @@ namespace _TERM_
             return false;
         }
 
-        public void AddCompletion(in string candidate)
-        {
-            if (!string.IsNullOrEmpty(candidate) && !compl_candidates.Contains(candidate))
-                compl_candidates.Add(candidate);
-        }
-
+        public void AddCompletions(params string[] candidates) => AddCompletions((IEnumerable<string>)candidates);
         public void AddCompletions(IEnumerable<string> candidates)
         {
             if (candidates == null)
                 return;
 
             foreach (string candidate in candidates)
-                AddCompletion(candidate);
+                if (!string.IsNullOrEmpty(candidate) && !compl_candidates.Contains(candidate))
+                    compl_candidates.Add(candidate);
         }
 
         public bool IsOnCompletion()

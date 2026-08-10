@@ -1,3 +1,4 @@
+using _ARK_;
 using System;
 using System.Net;
 using System.Net.Sockets;
@@ -15,6 +16,8 @@ namespace _TERM_
         TcpListener cmd_listener, log_listener;
         [SerializeField, Range(0, ushort.MaxValue)] int port_cmd, port_log;
         CancellationTokenSource cancellation;
+
+        RuntimeInfo runtimeInfo;
 
         //----------------------------------------------------------------------------------------------------------
 
@@ -45,6 +48,7 @@ namespace _TERM_
             LoadHSettings();
             Application.logMessageReceivedThreaded += OnUnityLog;
             StartServer();
+            runtimeInfo = new(new($"{GetType()} {{ {nameof(port_cmd)}: {port_cmd}, {nameof(port_log)}: {port_log}, }}"));
         }
 
         //----------------------------------------------------------------------------------------------------------
@@ -129,6 +133,7 @@ namespace _TERM_
             Application.logMessageReceivedThreaded -= OnUnityLog;
             DisposeTerminalLauncher();
             StopServer();
+            runtimeInfo.Dispose();
         }
     }
 }

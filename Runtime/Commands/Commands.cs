@@ -40,7 +40,8 @@ namespace _TERM_
     {
         public readonly List<object> args = new();
         public readonly Dictionary<string, object> options = new(StringComparer.Ordinal);
-        public CmdReader reader { get; internal set; }
+        internal CmdReader reader;
+        public CmdReader Reader => reader;
 
         //----------------------------------------------------------------------------------------------------------
 
