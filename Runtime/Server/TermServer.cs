@@ -49,17 +49,11 @@ namespace _TERM_
             Application.logMessageReceivedThreaded += OnUnityLog;
             StartServer();
             runtimeInfo = new(new($"{GetType()} {{ {nameof(port_cmd)}: {port_cmd}, {nameof(port_log)}: {port_log}, }}"));
+            NUCLEOR.delegates.OnApplicationFocus += () => LoadHSettings(log: false);
+            NUCLEOR.delegates.OnApplicationUnfocus += () => SaveHSettings(log: false);
         }
 
         //----------------------------------------------------------------------------------------------------------
-
-        private void OnApplicationFocus(bool focus)
-        {
-            if (focus)
-                LoadHSettings(log: false);
-            else
-                SaveHSettings(log: false);
-        }
 
         private void Update()
         {
