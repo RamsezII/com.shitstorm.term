@@ -13,6 +13,12 @@ namespace _TERM_
     public sealed class CmdReader
     {
         internal readonly CmdTypes type;
+        public bool ShouldBeComplete => type switch
+        {
+            CmdTypes.Check or CmdTypes.Execute => true,
+            _ => false,
+        };
+
         public readonly string line;
         public readonly int cursor;
         int start_i, read_i;
@@ -46,8 +52,17 @@ namespace _TERM_
 
         //----------------------------------------------------------------------------------------------------------
 
+        public void AppendError(in string error)
+        {
+            if (error != null)
+                error_sb.Append(error);
+        }
+
         public void WriteError(in string error, in bool force = false)
         {
+            if (error == null)
+                return;
+
             if (error_sb.Length == 0)
                 error_sb.Append(error);
             else if (force)
@@ -94,7 +109,7 @@ namespace _TERM_
         public void AddCompletions(params string[] candidates) => AddCompletions((IEnumerable<string>)candidates);
         public void AddCompletions(IEnumerable<string> candidates)
         {
-            if (candidates == null)
+            if (candidates == null || !IsOnCompletion())
                 return;
 
             foreach (string candidate in candidates)

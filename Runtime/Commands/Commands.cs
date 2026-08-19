@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace _TERM_
 {
@@ -45,7 +46,7 @@ namespace _TERM_
 
         //----------------------------------------------------------------------------------------------------------
 
-        internal CmdContext(CmdReader reader)
+        internal CmdContext(in CmdReader reader)
         {
             this.reader = reader;
         }
@@ -54,12 +55,14 @@ namespace _TERM_
     public abstract class CmdNode
     {
         public readonly string name;
+        public readonly object owner;
 
         //----------------------------------------------------------------------------------------------------------
 
-        protected CmdNode(in string name)
+        protected CmdNode(in string name, in object owner)
         {
             this.name = name;
+            this.owner = owner;
         }
 
         //----------------------------------------------------------------------------------------------------------
@@ -69,19 +72,25 @@ namespace _TERM_
 
     public sealed class CmdNamespace : CmdNode
     {
-        public readonly Dictionary<string, CmdNode> cmd_nodes = new(StringComparer.OrdinalIgnoreCase);
+        readonly Dictionary<string, CmdNode> cmd_nodes = new(StringComparer.OrdinalIgnoreCase);
 
         //----------------------------------------------------------------------------------------------------------
 
-        public CmdNamespace(in string name) : base(name)
+        public CmdNamespace(in string name, in object owner) : base(name, owner)
         {
         }
 
         //----------------------------------------------------------------------------------------------------------
 
-        public void AddCommandNode(in CmdNode node)
+        public void AddCommand(in CmdCommand node) => AddCmdNode(node);
+        public void AddNamespace(in CmdNamespace node) => AddCmdNode(node);
+        void AddCmdNode(in CmdNode node) => cmd_nodes.Add(node.name, node);
+        public bool RemoveByKey(in string key) => cmd_nodes.Remove(key);
+        public void RemoveByOwner(in object owner)
         {
-            cmd_nodes.Add(node.name, node);
+            foreach (var pair in cmd_nodes.ToList())
+                if (owner == pair.Value.owner)
+                    cmd_nodes.Remove(pair.Key);
         }
 
         //----------------------------------------------------------------------------------------------------------
@@ -116,19 +125,18 @@ namespace _TERM_
 
     public sealed class CmdCommand : CmdNode
     {
-        public readonly Action<CmdReader, CmdContext> parse;
-        public readonly Func<CmdContext, string> execute;
+        public readonly Func<CmdReader, CmdContext, string> parse;
+        public readonly Action<CmdContext> action;
+        public readonly Func<CmdContext, string> function;
         public readonly Func<CmdContext, IEnumerator<CmdStep>> routine;
 
         //----------------------------------------------------------------------------------------------------------
 
-        public CmdCommand(in string name, in Action<CmdReader, CmdContext> parse = null, in Func<CmdContext, string> execute = null, in Func<CmdContext, IEnumerator<CmdStep>> routine = null) : base(name)
+        public CmdCommand(in string name, in object owner, in Func<CmdReader, CmdContext, string> parse = null, in Action<CmdContext> action = null, in Func<CmdContext, string> function = null, in Func<CmdContext, IEnumerator<CmdStep>> routine = null) : base(name, owner)
         {
-            if ((execute == null) == (routine == null))
-                throw new ArgumentException("A command must define exactly one execute or routine handler.");
-
             this.parse = parse;
-            this.execute = execute;
+            this.action = action;
+            this.function = function;
             this.routine = routine;
         }
 
@@ -138,14 +146,23 @@ namespace _TERM_
         {
             CmdContext context = new(reader);
 
-            parse?.Invoke(reader, context);
+            reader.AppendError(parse?.Invoke(reader, context));
 
             if (reader.HasError || reader.type != CmdTypes.Execute)
                 yield break;
 
-            if (execute != null)
+            if (action != null)
             {
-                string result = execute(context);
+                action(context);
+                var esend = connection.ESend(new CmdClient.CmdResponse_result(null));
+                while (esend.MoveNext())
+                    yield return null;
+                yield break;
+            }
+
+            if (function != null)
+            {
+                string result = function(context);
                 var esend = connection.ESend(new CmdClient.CmdResponse_result(result));
                 while (esend.MoveNext())
                     yield return null;

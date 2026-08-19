@@ -8,29 +8,33 @@ namespace _TERM_.Tests
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void OnAfterSceneLoad()
         {
-            TermServer.root_commands.AddCommandNode(new CmdCommand(
+            TermServer.root_commands.AddCommand(new(
                 name: "echo",
+                owner: null,
                 parse: static (reader, context) =>
                 {
                     if (reader.TryRead(out string output))
                         context.args.Add(output);
                     else
-                        reader.WriteError($"expected argument");
+                        return $"expected argument";
+                    return null;
                 },
-                execute: static context =>
+                function: static context =>
                 {
                     return (string)context.args[0];
                 }
             ));
 
-            TermServer.root_commands.AddCommandNode(new CmdCommand(
+            TermServer.root_commands.AddCommand(new(
                 name: "wait_seconds",
+                owner: null,
                 parse: static (reader, context) =>
                 {
                     if (reader.TryRead(out string output) && float.TryParse(output, out float seconds))
                         context.args.Add(seconds);
                     else
                         context.args.Add(0);
+                    return null;
                 },
                 routine: static context =>
                 {
@@ -48,8 +52,9 @@ namespace _TERM_.Tests
                 }
             ));
 
-            TermServer.root_commands.AddCommandNode(new CmdCommand(
+            TermServer.root_commands.AddCommand(new(
                 name: "wait_1second",
+                owner: null,
                 routine: static context =>
                 {
                     return EWait();
@@ -65,8 +70,9 @@ namespace _TERM_.Tests
                 }
             ));
 
-            TermServer.root_commands.AddCommandNode(new CmdCommand(
+            TermServer.root_commands.AddCommand(new(
                 name: "prompt_test",
+                owner: null,
                 routine: static context =>
                 {
                     return EPromptTest(context);
@@ -104,17 +110,19 @@ namespace _TERM_.Tests
             ));
 
             CmdNamespace ns = null;
-            TermServer.root_commands.AddCommandNode(ns = new("ns1"));
-            ns.AddCommandNode(ns = new("ns2"));
-            ns.AddCommandNode(ns = new("ns3"));
-            ns.AddCommandNode(new CmdCommand(
+            TermServer.root_commands.AddNamespace(ns = new("ns1", owner: null));
+            ns.AddNamespace(ns = new("ns2", owner: null));
+            ns.AddNamespace(ns = new("ns3", owner: null));
+            ns.AddCommand(new(
                 name: "test",
+                owner: null,
                 parse: static (reader, context) =>
                 {
                     reader.TryRead(out string output);
                     context.args.Add(output);
+                    return null;
                 },
-                execute: static context =>
+                function: static context =>
                 {
                     return (string)context.args[0];
                 }

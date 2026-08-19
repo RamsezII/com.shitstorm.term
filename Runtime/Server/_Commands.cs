@@ -8,7 +8,7 @@ namespace _TERM_
 
     partial class TermServer
     {
-        public static readonly CmdNamespace root_commands = new(nameof(root_commands));
+        public static readonly CmdNamespace root_commands = new(name: nameof(root_commands), owner: null);
 
         readonly List<IEnumerator> routines = new();
 
