@@ -56,11 +56,6 @@ namespace _TERM_
         {
             try
             {
-                await connection.ASend(new LogClient.LogResponse(
-                    type: LogClient.LogTypes.log,
-                    message: "Unity log stream connected."
-                ));
-
                 while (!token.IsCancellationRequested)
                     if (await connection.reader.ReadLineAsync() == null)
                         break;
