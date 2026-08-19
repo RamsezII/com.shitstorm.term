@@ -112,7 +112,7 @@ namespace _TERM_
 
                 error ??= reader.GetError;
 
-                if (error == null && type == CmdTypes.Complete)
+                if (type == CmdTypes.Complete)
                 {
                     var esend = connection.ESend(new CmdClient.CmdResponse_completions(reader));
                     while (esend.MoveNext())
@@ -120,12 +120,13 @@ namespace _TERM_
                 }
             }
 
-            if (error != null)
-            {
-                var esend = connection.ESend(new CmdClient.CmdResponse_error(error));
-                while (esend.MoveNext())
-                    yield return null;
-            }
+            if (type == CmdTypes.Execute)
+                if (error != null)
+                {
+                    var esend = connection.ESend(new CmdClient.CmdResponse_error(error));
+                    while (esend.MoveNext())
+                        yield return null;
+                }
         }
     }
 }

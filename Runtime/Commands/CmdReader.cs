@@ -1,24 +1,18 @@
 ﻿using System.Collections.Generic;
 using System.Text;
+using UnityEngine;
 
 namespace _TERM_
 {
     public enum CmdTypes : byte
     {
         Complete,
-        Check,
         Execute,
     }
 
     public sealed class CmdReader
     {
         internal readonly CmdTypes type;
-        public bool ShouldBeComplete => type switch
-        {
-            CmdTypes.Check or CmdTypes.Execute => true,
-            _ => false,
-        };
-
         public readonly string line;
         public readonly int cursor;
         int start_i, read_i;
@@ -41,13 +35,10 @@ namespace _TERM_
             compl_candidates = new List<string>();
             error_sb = new();
 
-            this.cursor = type switch
-            {
-                CmdTypes.Check or CmdTypes.Execute => this.line.Length,
-                _ when cursor < 0 => 0,
-                _ when cursor > this.line.Length => this.line.Length,
-                _ => cursor,
-            };
+            if (type == CmdTypes.Execute)
+                this.cursor = line.Length;
+            else
+                this.cursor = Mathf.Clamp(cursor, 0, line.Length);
         }
 
         //----------------------------------------------------------------------------------------------------------
