@@ -9,6 +9,8 @@ namespace _TERM_
 {
     public partial class TermServer : MonoBehaviour
     {
+        static TermServer instance;
+
         [Header("External terminal")]
         [SerializeField] KeyCode terminal_key = KeyCode.P;
         [SerializeField, Range(0, ushort.MaxValue)] ushort port_cmd_override, port_log_override;
@@ -22,6 +24,10 @@ namespace _TERM_
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void OnResetStatics()
         {
+            if (instance != null)
+                instance.StopServer();
+            instance = null;
+
             root_commands.Reset();
         }
 
