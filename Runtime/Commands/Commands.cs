@@ -15,6 +15,13 @@ namespace _TERM_
 
     public delegate void CmdCompleter(CmdReader reader);
 
+    public readonly struct CmdError
+    {
+        public readonly string message;
+        public CmdError(in string message) => this.message = message;
+        public static implicit operator CmdError(in string error) => new(error);
+    }
+
     public readonly struct CmdStep
     {
         internal readonly CmdStepTypes type;
@@ -39,16 +46,38 @@ namespace _TERM_
 
     public sealed class CmdContext
     {
-        public readonly List<object> args = new();
-        public readonly Dictionary<string, object> options = new(StringComparer.Ordinal);
+        public readonly List<object> list_args = new();
+        public readonly Dictionary<string, object> dict_options = new();
         internal CmdReader reader;
         public CmdReader Reader => reader;
+        internal CmdContext(in CmdReader reader) => this.reader = reader;
+    }
+
+    public sealed class CmdExecution
+    {
+        internal readonly Action<CmdContext> _action;
+        internal readonly Func<CmdContext, string> _function;
+        internal readonly Func<CmdContext, IEnumerator<CmdStep>> _routine;
+        internal readonly CmdError error;
 
         //----------------------------------------------------------------------------------------------------------
 
-        internal CmdContext(in CmdReader reader)
+        public static implicit operator CmdExecution(in Action<CmdContext> action) => new(_action: action);
+        public static implicit operator CmdExecution(in Func<CmdContext, string> function) => new(_function: function);
+        public static implicit operator CmdExecution(in Func<CmdContext, IEnumerator<CmdStep>> routine) => new(_routine: routine);
+        public static implicit operator CmdExecution(in CmdError error) => new(error: error);
+
+        CmdExecution(
+            in Action<CmdContext> _action = null,
+            in Func<CmdContext, string> _function = null,
+            in Func<CmdContext, IEnumerator<CmdStep>> _routine = null,
+            in CmdError error = default
+        )
         {
-            this.reader = reader;
+            this._action = _action;
+            this._function = _function;
+            this._routine = _routine;
+            this.error = error;
         }
     }
 
@@ -125,203 +154,200 @@ namespace _TERM_
 
     public sealed class CmdCommand : CmdNode
     {
-        public readonly Func<CmdReader, CmdContext, string> parse;
-        public readonly Action<CmdContext> action;
-        public readonly Func<CmdContext, string> function;
-        public readonly Func<CmdContext, IEnumerator<CmdStep>> routine;
+        internal readonly Func<CmdReader, CmdContext, CmdExecution> execution;
 
         //----------------------------------------------------------------------------------------------------------
 
-        public CmdCommand(in string name, in object owner, in Func<CmdReader, CmdContext, string> parse = null, in Action<CmdContext> action = null, in Func<CmdContext, string> function = null, in Func<CmdContext, IEnumerator<CmdStep>> routine = null) : base(name, owner)
+        public CmdCommand(in string name, in object owner, in Func<CmdReader, CmdContext, CmdExecution> execution) : base(name, owner)
         {
-            this.parse = parse;
-            this.action = action;
-            this.function = function;
-            this.routine = routine;
+            this.execution = execution;
         }
 
         //----------------------------------------------------------------------------------------------------------
 
         internal override IEnumerator HandleRequest(CmdClient connection, CmdReader reader)
         {
-            CmdContext context = new(reader);
+            var context = new CmdContext(reader);
+            var executor = execution(reader, context);
 
-            reader.AppendError(parse?.Invoke(reader, context));
+            reader.Error(executor.error.message);
 
-            if (reader.HasError || reader.type != CmdTypes.Execute)
+            if (executor == null || reader.HasError || reader.type != CmdTypes.Execute)
                 yield break;
 
-            if (action != null)
+            if (executor._action != null)
             {
-                action(context);
+                executor._action(context);
                 var esend = connection.ESend(new CmdClient.CmdResponse_result(null));
                 while (esend.MoveNext())
                     yield return null;
-                yield break;
             }
 
-            if (function != null)
+            if (executor._function != null)
             {
-                string result = function(context);
+                string result = executor._function(context);
                 var esend = connection.ESend(new CmdClient.CmdResponse_result(result));
                 while (esend.MoveNext())
                     yield return null;
-                yield break;
             }
 
-            using IEnumerator<CmdStep> command_routine = routine(context);
-            string routine_result = null;
-            bool cancelled = false;
-            bool failed = false;
-            bool finished = false;
-
-            while (!finished && !cancelled && !failed && !connection.IsClosed)
+            if (executor._routine != null)
             {
-                bool moved = false;
-                CmdStep step = default;
-                Exception exception = null;
+                using IEnumerator<CmdStep> command_routine = executor._routine(context);
+                string routine_result = null;
+                bool cancelled = false;
+                bool failed = false;
+                bool finished = false;
 
-                try
+                while (!finished && !cancelled && !failed && !connection.IsClosed)
                 {
-                    moved = command_routine.MoveNext();
-                    if (moved)
-                        step = command_routine.Current;
-                }
-                catch (Exception e)
-                {
-                    exception = e;
-                }
+                    bool moved = false;
+                    CmdStep step = default;
+                    Exception exception = null;
 
-                if (exception != null)
-                {
-                    var eexception = connection.ESend(new CmdClient.CmdResponse_exception(exception));
-                    while (eexception.MoveNext())
-                        yield return null;
-                    yield break;
-                }
-
-                if (!moved)
-                    break;
-
-                if (step.type == CmdStepTypes.Prompt)
-                {
-                    var eprompt = connection.ESend(new CmdClient.CmdResponse_prompt(step.text));
-                    while (eprompt.MoveNext())
-                        yield return null;
-
-                    bool received_input = false;
-
-                    while (!received_input && !cancelled && !failed && !connection.IsClosed)
+                    try
                     {
-                        if (!connection.TryDequeue(out CmdClient.CmdRequest request))
-                        {
+                        moved = command_routine.MoveNext();
+                        if (moved)
+                            step = command_routine.Current;
+                    }
+                    catch (Exception e)
+                    {
+                        exception = e;
+                    }
+
+                    if (exception != null)
+                    {
+                        var eexception = connection.ESend(new CmdClient.CmdResponse_exception(exception));
+                        while (eexception.MoveNext())
                             yield return null;
-                            continue;
-                        }
+                        yield break;
+                    }
 
-                        if (request.error != null)
+                    if (!moved)
+                        break;
+
+                    if (step.type == CmdStepTypes.Prompt)
+                    {
+                        var eprompt = connection.ESend(new CmdClient.CmdResponse_prompt(step.text));
+                        while (eprompt.MoveNext())
+                            yield return null;
+
+                        bool received_input = false;
+
+                        while (!received_input && !cancelled && !failed && !connection.IsClosed)
                         {
-                            var eerror = connection.ESend(new CmdClient.CmdResponse_error(request.error));
-                            while (eerror.MoveNext())
+                            if (!connection.TryDequeue(out CmdClient.CmdRequest request))
+                            {
                                 yield return null;
-                            failed = true;
-                        }
-                        else if (string.Equals(request.type, "input", StringComparison.OrdinalIgnoreCase))
-                        {
-                            context.reader = new(type: CmdTypes.Execute, line: request.cmdline);
-                            received_input = true;
-                        }
-                        else if (string.Equals(request.type, "complete", StringComparison.OrdinalIgnoreCase))
-                        {
-                            CmdReader completion_reader = new(type: CmdTypes.Complete, line: request.cmdline, cursor: request.cursor);
-                            Exception completion_exception = null;
-
-                            try
-                            {
-                                step.completer?.Invoke(completion_reader);
-                            }
-                            catch (Exception e)
-                            {
-                                completion_exception = e;
+                                continue;
                             }
 
-                            if (completion_exception == null)
+                            if (request.error != null)
                             {
-                                var ecompletion = connection.ESend(new CmdClient.CmdResponse_completions(completion_reader));
-                                while (ecompletion.MoveNext())
+                                var eerror = connection.ESend(new CmdClient.CmdResponse_error(request.error));
+                                while (eerror.MoveNext())
                                     yield return null;
+                                failed = true;
                             }
+                            else if (string.Equals(request.type, "input", StringComparison.OrdinalIgnoreCase))
+                            {
+                                context.reader = new(type: CmdTypes.Execute, line: request.cmdline);
+                                received_input = true;
+                            }
+                            else if (string.Equals(request.type, "complete", StringComparison.OrdinalIgnoreCase))
+                            {
+                                CmdReader completion_reader = new(type: CmdTypes.Complete, line: request.cmdline, cursor: request.cursor);
+                                Exception completion_exception = null;
+
+                                try
+                                {
+                                    step.completer?.Invoke(completion_reader);
+                                }
+                                catch (Exception e)
+                                {
+                                    completion_exception = e;
+                                }
+
+                                if (completion_exception == null)
+                                {
+                                    var ecompletion = connection.ESend(new CmdClient.CmdResponse_completions(completion_reader));
+                                    while (ecompletion.MoveNext())
+                                        yield return null;
+                                }
+                                else
+                                {
+                                    var eexception = connection.ESend(new CmdClient.CmdResponse_exception(completion_exception));
+                                    while (eexception.MoveNext())
+                                        yield return null;
+                                }
+                            }
+                            else if (string.Equals(request.type, "cancel", StringComparison.OrdinalIgnoreCase))
+                                cancelled = true;
                             else
                             {
-                                var eexception = connection.ESend(new CmdClient.CmdResponse_exception(completion_exception));
-                                while (eexception.MoveNext())
+                                var eerror = connection.ESend(new CmdClient.CmdResponse_error($"Expected prompt input, completion or cancellation, received '{request.type}'."));
+                                while (eerror.MoveNext())
                                     yield return null;
+                                failed = true;
                             }
                         }
-                        else if (string.Equals(request.type, "cancel", StringComparison.OrdinalIgnoreCase))
-                            cancelled = true;
-                        else
+                    }
+                    else if (step.type == CmdStepTypes.Status)
+                    {
+                        var estatus = connection.ESend(new CmdClient.CmdResponse_status(step.text, step.progress));
+                        while (estatus.MoveNext())
+                            yield return null;
+                    }
+                    else if (step.type == CmdStepTypes.Result)
+                    {
+                        routine_result = step.text;
+                        finished = true;
+                    }
+                    else
+                    {
+                        if (connection.TryDequeue(out CmdClient.CmdRequest request))
                         {
-                            var eerror = connection.ESend(new CmdClient.CmdResponse_error($"Expected prompt input, completion or cancellation, received '{request.type}'."));
-                            while (eerror.MoveNext())
-                                yield return null;
-                            failed = true;
+                            if (request.error != null)
+                            {
+                                var eerror = connection.ESend(new CmdClient.CmdResponse_error(request.error));
+                                while (eerror.MoveNext())
+                                    yield return null;
+                                failed = true;
+                            }
+                            else if (string.Equals(request.type, "cancel", StringComparison.OrdinalIgnoreCase))
+                                cancelled = true;
+                            else
+                            {
+                                var eerror = connection.ESend(new CmdClient.CmdResponse_error($"Command is not waiting for input; received '{request.type}'."));
+                                while (eerror.MoveNext())
+                                    yield return null;
+                                failed = true;
+                            }
                         }
+
+                        if (!cancelled && !failed)
+                            yield return null;
                     }
                 }
-                else if (step.type == CmdStepTypes.Status)
+
+                if (connection.IsClosed || failed)
+                    yield break;
+
+                if (cancelled)
                 {
-                    var estatus = connection.ESend(new CmdClient.CmdResponse_status(step.text, step.progress));
-                    while (estatus.MoveNext())
+                    var ecancelled = connection.ESend(new CmdClient.CmdResponse_cancelled());
+                    while (ecancelled.MoveNext())
                         yield return null;
-                }
-                else if (step.type == CmdStepTypes.Result)
-                {
-                    routine_result = step.text;
-                    finished = true;
                 }
                 else
                 {
-                    if (connection.TryDequeue(out CmdClient.CmdRequest request))
-                    {
-                        if (request.error != null)
-                        {
-                            var eerror = connection.ESend(new CmdClient.CmdResponse_error(request.error));
-                            while (eerror.MoveNext())
-                                yield return null;
-                            failed = true;
-                        }
-                        else if (string.Equals(request.type, "cancel", StringComparison.OrdinalIgnoreCase))
-                            cancelled = true;
-                        else
-                        {
-                            var eerror = connection.ESend(new CmdClient.CmdResponse_error($"Command is not waiting for input; received '{request.type}'."));
-                            while (eerror.MoveNext())
-                                yield return null;
-                            failed = true;
-                        }
-                    }
-
-                    if (!cancelled && !failed)
+                    var eresult = connection.ESend(new CmdClient.CmdResponse_result(routine_result));
+                    while (eresult.MoveNext())
                         yield return null;
                 }
             }
-
-            if (connection.IsClosed || failed)
-                yield break;
-
-            if (cancelled)
-            {
-                var ecancelled = connection.ESend(new CmdClient.CmdResponse_cancelled());
-                while (ecancelled.MoveNext())
-                    yield return null;
-            }
-            else
-            {
-                var eresult = connection.ESend(new CmdClient.CmdResponse_result(routine_result));
-                while (eresult.MoveNext())
-                    yield return null;
-            }
         }
+
     }
 }

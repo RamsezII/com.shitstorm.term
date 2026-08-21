@@ -11,38 +11,33 @@ namespace _TERM_.Tests
             TermServer.root_commands.AddCommand(new(
                 name: "echo",
                 owner: null,
-                parse: static (reader, context) =>
+                execution: static (reader, context) =>
                 {
                     if (reader.TryRead(out string output))
-                        context.args.Add(output);
+                    {
+                        context.list_args.Add(output);
+                        return (CmdExecution)(static context => (string)context.list_args[0]);
+                    }
                     else
-                        return $"expected argument";
+                        reader.Error($"expected argument");
                     return null;
-                },
-                function: static context =>
-                {
-                    return (string)context.args[0];
                 }
             ));
 
             TermServer.root_commands.AddCommand(new(
                 name: "wait_seconds",
                 owner: null,
-                parse: static (reader, context) =>
+                execution: static (reader, context) =>
                 {
-                    if (reader.TryRead(out string output) && float.TryParse(output, out float seconds))
-                        context.args.Add(seconds);
-                    else
-                        context.args.Add(0);
-                    return null;
-                },
-                routine: static context =>
-                {
-                    float seconds = (float)context.args[0];
-                    return EWait(seconds);
-                    static IEnumerator<CmdStep> EWait(float seconds)
+                    if (!reader.TryRead(out string output) || !float.TryParse(output, out float seconds))
+                        seconds = 0;
+                    context.list_args.Add(seconds);
+
+                    return (CmdExecution)EWait;
+                    static IEnumerator<CmdStep> EWait(CmdContext context)
                     {
                         float timer = 0;
+                        float seconds = (float)context.list_args[0];
                         while (timer < seconds)
                         {
                             timer += Time.unscaledDeltaTime;
@@ -55,10 +50,10 @@ namespace _TERM_.Tests
             TermServer.root_commands.AddCommand(new(
                 name: "wait_1second",
                 owner: null,
-                routine: static context =>
+                execution: static (reader, context) =>
                 {
-                    return EWait();
-                    static IEnumerator<CmdStep> EWait()
+                    return (CmdExecution)EWait;
+                    static IEnumerator<CmdStep> EWait(CmdContext context)
                     {
                         float timer = 0;
                         while (timer < 1)
@@ -73,10 +68,9 @@ namespace _TERM_.Tests
             TermServer.root_commands.AddCommand(new(
                 name: "prompt_test",
                 owner: null,
-                routine: static context =>
+                execution: static (reader, context) =>
                 {
-                    return EPromptTest(context);
-
+                    return (CmdExecution)EPromptTest;
                     static IEnumerator<CmdStep> EPromptTest(CmdContext context)
                     {
                         yield return CmdStep.Prompt("name: ", static reader =>
@@ -116,15 +110,11 @@ namespace _TERM_.Tests
             ns.AddCommand(new(
                 name: "test",
                 owner: null,
-                parse: static (reader, context) =>
+                execution: static (reader, context) =>
                 {
                     reader.TryRead(out string output);
-                    context.args.Add(output);
-                    return null;
-                },
-                function: static context =>
-                {
-                    return (string)context.args[0];
+                    context.list_args.Add(output);
+                    return (CmdExecution)(static context => (string)context.list_args[0]);
                 }
             ));
         }

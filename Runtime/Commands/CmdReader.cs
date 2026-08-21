@@ -43,13 +43,13 @@ namespace _TERM_
 
         //----------------------------------------------------------------------------------------------------------
 
-        public void AppendError(in string error)
+        public void Error(in string error)
         {
             if (error != null)
                 error_sb.Append(error);
         }
 
-        public void WriteError(in string error, in bool force = false)
+        internal void WriteError(in string error, in bool force = false)
         {
             if (error == null)
                 return;
