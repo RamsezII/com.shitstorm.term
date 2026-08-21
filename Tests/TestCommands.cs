@@ -8,21 +8,21 @@ namespace _TERM_.Tests
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void OnAfterSceneLoad()
         {
-            TermServer.root_namespace.AddCommand("echo", static (reader, context) =>
+            TermServer.root_namespace.AddCommand("echo", static context =>
             {
-                if (reader.TryRead(out string output))
+                if (context.Reader.TryRead(out string output))
                 {
                     context.list_args.Add(output);
                     return (CmdExecution)(static context => (string)context.list_args[0]);
                 }
 
-                reader.Error($"expected argument");
+                context.Reader.Error($"expected argument");
                 return null;
             });
 
-            TermServer.root_namespace.AddCommand("wait_seconds", static (reader, context) =>
+            TermServer.root_namespace.AddCommand("wait_seconds", static context =>
             {
-                if (!reader.TryRead(out string output) || !float.TryParse(output, out float seconds))
+                if (!context.Reader.TryRead(out string output) || !float.TryParse(output, out float seconds))
                     seconds = 0;
                 context.list_args.Add(seconds);
 
@@ -39,7 +39,7 @@ namespace _TERM_.Tests
                 }
             });
 
-            TermServer.root_namespace.AddCommand("wait_1second", static (reader, context) =>
+            TermServer.root_namespace.AddCommand("wait_1second", static context =>
             {
                 return (CmdExecution)EWait;
                 static IEnumerator<CmdStep> EWait(CmdContext context)
@@ -53,7 +53,7 @@ namespace _TERM_.Tests
                 }
             });
 
-            TermServer.root_namespace.AddCommand("prompt_test", static (reader, context) =>
+            TermServer.root_namespace.AddCommand("prompt_test", static context =>
             {
                 return (CmdExecution)EPromptTest;
                 static IEnumerator<CmdStep> EPromptTest(CmdContext context)
@@ -89,9 +89,9 @@ namespace _TERM_.Tests
 
             TermServer.root_namespace.AddNamespace("ns1").AddNamespace("ns2").AddNamespace("ns3").AddCommand(
                 name: "test",
-                execution: static (reader, context) =>
+                execution: static context =>
                 {
-                    reader.TryRead(out string output);
+                    context.Reader.TryRead(out string output);
                     context.list_args.Add(output);
                     return (CmdExecution)(static context => (string)context.list_args[0]);
                 }

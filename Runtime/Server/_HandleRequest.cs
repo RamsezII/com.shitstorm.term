@@ -8,7 +8,7 @@ namespace _TERM_
         static IEnumerator<float> HandleRequest(CmdClient connection, CmdReader reader)
         {
             var context = new CmdContext(reader);
-            CmdExecution execution = root_namespace.TryParseCommand_term(reader, context);
+            CmdExecution execution = root_namespace.TryParseCommand_term(context);
 
             if (execution == null)
                 yield break;
