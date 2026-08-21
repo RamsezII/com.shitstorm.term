@@ -27,8 +27,8 @@ namespace _TERM_
             if (instance != null)
                 instance.StopServer();
             instance = null;
-
-            root_commands.Reset();
+            root_namespace.tree.Clear();
+            root_namespace.users.Clear();
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]

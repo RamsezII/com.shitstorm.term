@@ -8,8 +8,7 @@ namespace _TERM_
 
     partial class TermServer
     {
-        public static readonly CmdNamespace root_commands = new(name: nameof(root_commands), owner: null);
-
+        public static readonly CmdNamespace root_namespace = new();
         readonly List<IEnumerator> routines = new();
 
         //----------------------------------------------------------------------------------------------------------
@@ -98,7 +97,7 @@ namespace _TERM_
             {
                 CmdReader reader = new(type: type, line: request.cmdline, cursor: request.cursor);
 
-                var routine = root_commands.HandleRequest(connection, reader);
+                var routine = HandleRequest(connection, reader);
                 if (routine != null)
                     try
                     {

@@ -8,115 +8,94 @@ namespace _TERM_.Tests
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void OnAfterSceneLoad()
         {
-            TermServer.root_commands.AddCommand(new(
-                name: "echo",
-                owner: null,
-                execution: static (reader, context) =>
+            TermServer.root_namespace.AddCommand("echo", static (reader, context) =>
+            {
+                if (reader.TryRead(out string output))
                 {
-                    if (reader.TryRead(out string output))
-                    {
-                        context.list_args.Add(output);
-                        return (CmdExecution)(static context => (string)context.list_args[0]);
-                    }
-                    else
-                        reader.Error($"expected argument");
-                    return null;
+                    context.list_args.Add(output);
+                    return (CmdExecution)(static context => (string)context.list_args[0]);
                 }
-            ));
 
-            TermServer.root_commands.AddCommand(new(
-                name: "wait_seconds",
-                owner: null,
-                execution: static (reader, context) =>
+                reader.Error($"expected argument");
+                return null;
+            });
+
+            TermServer.root_namespace.AddCommand("wait_seconds", static (reader, context) =>
+            {
+                if (!reader.TryRead(out string output) || !float.TryParse(output, out float seconds))
+                    seconds = 0;
+                context.list_args.Add(seconds);
+
+                return (CmdExecution)EWait;
+                static IEnumerator<CmdStep> EWait(CmdContext context)
                 {
-                    if (!reader.TryRead(out string output) || !float.TryParse(output, out float seconds))
-                        seconds = 0;
-                    context.list_args.Add(seconds);
-
-                    return (CmdExecution)EWait;
-                    static IEnumerator<CmdStep> EWait(CmdContext context)
+                    float timer = 0;
+                    float seconds = (float)context.list_args[0];
+                    while (timer < seconds)
                     {
-                        float timer = 0;
-                        float seconds = (float)context.list_args[0];
-                        while (timer < seconds)
-                        {
-                            timer += Time.unscaledDeltaTime;
-                            yield return default;
-                        }
+                        timer += Time.unscaledDeltaTime;
+                        yield return default;
                     }
                 }
-            ));
+            });
 
-            TermServer.root_commands.AddCommand(new(
-                name: "wait_1second",
-                owner: null,
-                execution: static (reader, context) =>
+            TermServer.root_namespace.AddCommand("wait_1second", static (reader, context) =>
+            {
+                return (CmdExecution)EWait;
+                static IEnumerator<CmdStep> EWait(CmdContext context)
                 {
-                    return (CmdExecution)EWait;
-                    static IEnumerator<CmdStep> EWait(CmdContext context)
+                    float timer = 0;
+                    while (timer < 1)
                     {
-                        float timer = 0;
-                        while (timer < 1)
-                        {
-                            timer += Time.unscaledDeltaTime;
-                            yield return default;
-                        }
+                        timer += Time.unscaledDeltaTime;
+                        yield return default;
                     }
                 }
-            ));
+            });
 
-            TermServer.root_commands.AddCommand(new(
-                name: "prompt_test",
-                owner: null,
-                execution: static (reader, context) =>
+            TermServer.root_namespace.AddCommand("prompt_test", static (reader, context) =>
+            {
+                return (CmdExecution)EPromptTest;
+                static IEnumerator<CmdStep> EPromptTest(CmdContext context)
                 {
-                    return (CmdExecution)EPromptTest;
-                    static IEnumerator<CmdStep> EPromptTest(CmdContext context)
+                    yield return CmdStep.Prompt("name: ", static reader =>
                     {
-                        yield return CmdStep.Prompt("name: ", static reader =>
+                        reader.TryRead(out _);
+                        if (reader.IsOnCompletion())
+                            reader.AddCompletions((IEnumerable<string>)(new[] { "Josué", "Devante", "ShittyG", }));
+                        else
                         {
                             reader.TryRead(out _);
                             if (reader.IsOnCompletion())
-                                reader.AddCompletions((IEnumerable<string>)(new[] { "Josué", "Devante", "ShittyG", }));
-                            else
-                            {
-                                reader.TryRead(out _);
-                                if (reader.IsOnCompletion())
-                                    reader.AddCompletions((IEnumerable<string>)(new[] { "Jamaguil", "Vinquoas-Copernicus-Cock", }));
-                            }
-                        });
+                                reader.AddCompletions((IEnumerable<string>)(new[] { "Jamaguil", "Vinquoas-Copernicus-Cock", }));
+                        }
+                    });
 
-                        context.Reader.TryRead(out string name1);
-                        context.Reader.TryRead(out string name2);
+                    context.Reader.TryRead(out string name1);
+                    context.Reader.TryRead(out string name2);
 
-                        yield return CmdStep.Prompt("colors: ", static reader =>
-                        {
-                            reader.TryRead(out _);
-                            if (reader.IsOnCompletion())
-                                reader.AddCompletions((IEnumerable<string>)(new[] { "bleu", "jaune", "rouge", "vert" }));
-                        });
+                    yield return CmdStep.Prompt("colors: ", static reader =>
+                    {
+                        reader.TryRead(out _);
+                        if (reader.IsOnCompletion())
+                            reader.AddCompletions((IEnumerable<string>)(new[] { "bleu", "jaune", "rouge", "vert" }));
+                    });
 
-                        context.Reader.TryRead(out string color);
+                    context.Reader.TryRead(out string color);
 
-                        yield return CmdStep.Result($"Salut {name1} {name2}, ta couleur préférée est {color}.");
-                    }
+                    yield return CmdStep.Result($"Salut {name1} {name2}, ta couleur préférée est {color}.");
                 }
-            ));
+            });
 
-            CmdNamespace ns = null;
-            TermServer.root_commands.AddNamespace(ns = new("ns1", owner: null));
-            ns.AddNamespace(ns = new("ns2", owner: null));
-            ns.AddNamespace(ns = new("ns3", owner: null));
-            ns.AddCommand(new(
+            TermServer.root_namespace.AddNamespace("ns1").AddNamespace("ns2").AddNamespace("ns3").AddCommand(
                 name: "test",
-                owner: null,
                 execution: static (reader, context) =>
                 {
                     reader.TryRead(out string output);
                     context.list_args.Add(output);
                     return (CmdExecution)(static context => (string)context.list_args[0]);
                 }
-            ));
+            );
         }
     }
 }
