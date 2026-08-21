@@ -16,6 +16,7 @@ namespace _TERM_
         public readonly string line;
         public readonly int cursor;
         int start_i, read_i;
+        string last_read;
         internal int compl_start;
         internal readonly List<string> compl_candidates;
         readonly StringBuilder error_sb;
@@ -85,10 +86,9 @@ namespace _TERM_
             if (read_i < cursor)
             {
                 SkipNoneEmpties();
-
                 if (read_i > start_i)
                 {
-                    output = line[start_i..read_i];
+                    last_read = output = line[start_i..read_i];
                     return true;
                 }
             }
@@ -104,8 +104,10 @@ namespace _TERM_
                 return;
 
             foreach (string candidate in candidates)
-                if (!string.IsNullOrEmpty(candidate) && !compl_candidates.Contains(candidate))
-                    compl_candidates.Add(candidate);
+                if (!string.IsNullOrEmpty(candidate))
+                    if (!compl_candidates.Contains(candidate))
+                        if (string.IsNullOrWhiteSpace(last_read) || Util.IsMatchChars(last_read, candidate))
+                            compl_candidates.Add(candidate);
         }
 
         public bool IsOnCompletion()
