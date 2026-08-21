@@ -60,14 +60,14 @@ namespace _TERM_.Tests
                 {
                     yield return CmdStep.Prompt("name: ", static reader =>
                     {
-                        reader.TryRead(out _);
+                        reader.TryRead(out string arg);
                         if (reader.IsOnCompletion())
-                            reader.AddCompletions((IEnumerable<string>)(new[] { "Josué", "Devante", "ShittyG", }));
+                            reader.AddCompletions(arg, "Josué", "Devante", "ShittyG");
                         else
                         {
-                            reader.TryRead(out _);
+                            reader.TryRead(out arg);
                             if (reader.IsOnCompletion())
-                                reader.AddCompletions((IEnumerable<string>)(new[] { "Jamaguil", "Vinquoas-Copernicus-Cock", }));
+                                reader.AddCompletions(arg, "Jamaguil", "Diesel-Vincock");
                         }
                     });
 
@@ -76,9 +76,9 @@ namespace _TERM_.Tests
 
                     yield return CmdStep.Prompt("colors: ", static reader =>
                     {
-                        reader.TryRead(out _);
+                        reader.TryRead(out var arg);
                         if (reader.IsOnCompletion())
-                            reader.AddCompletions((IEnumerable<string>)(new[] { "bleu", "jaune", "rouge", "vert" }));
+                            reader.AddCompletions(arg, "bleu", "jaune", "rouge", "vert");
                     });
 
                     context.Reader.TryRead(out string color);

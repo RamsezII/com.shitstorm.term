@@ -86,10 +86,10 @@ namespace _TERM_
 
         internal override CmdExecution TryParseCommand_term(in CmdReader reader, in CmdContext context)
         {
-            reader.TryRead(out var arg0);
+            bool arg0_b = reader.TryRead(out var arg0);
 
             if (reader.IsOnCompletion())
-                reader.AddCompletions(tree.Keys);
+                reader.AddCompletions(arg0, tree.Keys);
 
             foreach (var user in users)
             {
@@ -98,12 +98,9 @@ namespace _TERM_
                     return execution;
             }
 
-            foreach (var pair in tree)
-            {
-                var execution = pair.Value.TryParseCommand_term(reader, context);
-                if (execution.ready)
-                    return execution;
-            }
+            if (arg0_b)
+                if (tree.TryGetValue(arg0, out var node))
+                    return node.TryParseCommand_term(reader, context);
 
             return null;
         }

@@ -10,12 +10,13 @@ namespace _TERM_
             var context = new CmdContext(reader);
             CmdExecution execution = root_namespace.TryParseCommand_term(reader, context);
 
-            if (!execution.ready)
-            {
-                reader.Error(execution.error.message);
-                if (execution == null || reader.HasError || reader.type != CmdTypes.Execute)
-                    yield break;
-            }
+            if (execution == null)
+                yield break;
+
+            reader.Error(execution.error.message);
+
+            if (reader.type != CmdTypes.Execute || reader.HasError || !execution.ready)
+                yield break;
 
             if (execution._action != null)
             {
@@ -35,7 +36,7 @@ namespace _TERM_
 
             if (execution._routine != null)
             {
-                using IEnumerator<CmdStep> command_routine = execution._routine(context);
+                using var command_routine = execution._routine(context);
                 string routine_result = null;
                 bool cancelled = false;
                 bool failed = false;

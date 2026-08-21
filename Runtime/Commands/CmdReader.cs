@@ -16,7 +16,6 @@ namespace _TERM_
         public readonly string line;
         public readonly int cursor;
         int start_i, read_i;
-        string last_read;
         internal int compl_start;
         internal readonly List<string> compl_candidates;
         readonly StringBuilder error_sb;
@@ -88,7 +87,7 @@ namespace _TERM_
                 SkipNoneEmpties();
                 if (read_i > start_i)
                 {
-                    last_read = output = line[start_i..read_i];
+                    output = line[start_i..read_i];
                     return true;
                 }
             }
@@ -97,8 +96,8 @@ namespace _TERM_
             return false;
         }
 
-        public void AddCompletions(params string[] candidates) => AddCompletions((IEnumerable<string>)candidates);
-        public void AddCompletions(IEnumerable<string> candidates)
+        public void AddCompletions(in string prefixe, params string[] candidates) => AddCompletions(prefixe, (IEnumerable<string>)candidates);
+        public void AddCompletions(in string argument, IEnumerable<string> candidates)
         {
             if (candidates == null || !IsOnCompletion())
                 return;
@@ -106,7 +105,7 @@ namespace _TERM_
             foreach (string candidate in candidates)
                 if (!string.IsNullOrEmpty(candidate))
                     if (!compl_candidates.Contains(candidate))
-                        if (string.IsNullOrWhiteSpace(last_read) || Util.IsMatchChars(last_read, candidate))
+                        if (string.IsNullOrWhiteSpace(argument) || Util.IsMatchChars(argument, candidate))
                             compl_candidates.Add(candidate);
         }
 
