@@ -84,7 +84,7 @@ namespace _TERM_
 
         public void AddCommand(in CmdCommand node) => AddCmdNode(node);
         public void AddNamespace(in CmdNamespace node) => AddCmdNode(node);
-        void AddCmdNode(in CmdNode node) => cmd_nodes.Add(node.name, node);
+        public void AddCmdNode(in CmdNode node) => cmd_nodes.Add(node.name, node);
         public bool RemoveByKey(in string key) => cmd_nodes.Remove(key);
         public void RemoveByOwner(in object owner)
         {
