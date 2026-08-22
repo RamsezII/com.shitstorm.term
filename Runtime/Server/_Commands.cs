@@ -97,17 +97,10 @@ namespace _TERM_
             {
                 CmdReader reader = new(type: type, line: request.cmdline, cursor: request.cursor);
 
-                var routine = HandleRequest(connection, reader);
+                using var routine = HandleRequest(connection, reader);
                 if (routine != null)
-                    try
-                    {
-                        while (routine.MoveNext())
-                            yield return null;
-                    }
-                    finally
-                    {
-                        (routine as IDisposable)?.Dispose();
-                    }
+                    while (routine.MoveNext())
+                        yield return null;
 
                 error ??= reader.GetError;
 

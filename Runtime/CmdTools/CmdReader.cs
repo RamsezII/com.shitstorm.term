@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 
@@ -16,6 +17,7 @@ namespace _TERM_
         public readonly string line;
         public readonly int cursor;
         int start_i, read_i;
+        internal string read_last;
         internal int compl_start;
         internal readonly List<string> compl_candidates;
         readonly StringBuilder error_sb;
@@ -49,20 +51,6 @@ namespace _TERM_
                 error_sb.Append(error);
         }
 
-        internal void WriteError(in string error, in bool force = false)
-        {
-            if (error == null)
-                return;
-
-            if (error_sb.Length == 0)
-                error_sb.Append(error);
-            else if (force)
-            {
-                error_sb.Clear();
-                error_sb.Append(error);
-            }
-        }
-
         public void SkipEmpties() => SkipEmpties(ref read_i);
         public void SkipEmpties(ref int read_i)
         {
@@ -77,17 +65,18 @@ namespace _TERM_
                 ++read_i;
         }
 
-        public bool TryRead(out string output)
+        public bool TryRead(out string output) => TryRead(ref read_i, out output);
+        public bool TryRead(ref int read_i, out string output)
         {
-            SkipEmpties();
+            SkipEmpties(ref read_i);
             start_i = read_i;
 
             if (read_i < cursor)
             {
-                SkipNoneEmpties();
+                SkipNoneEmpties(ref read_i);
                 if (read_i > start_i)
                 {
-                    output = line[start_i..read_i];
+                    read_last = output = line[start_i..read_i];
                     return true;
                 }
             }
@@ -96,6 +85,24 @@ namespace _TERM_
             return false;
         }
 
+        public bool TryReadMatch(in string option, in StringComparison comparison = StringComparison.Ordinal)
+        {
+            SkipEmpties();
+            int read_i = this.read_i;
+
+            if (TryRead(ref read_i, out string output))
+                if (output.Equals(option, comparison))
+                {
+                    this.read_i = read_i;
+                    AddCompletions(output, option);
+                    return true;
+                }
+
+            AddCompletions(output, option);
+            return false;
+        }
+
+        public void AddCompletions<T>(in string prefixe) where T : Enum => AddCompletions(prefixe, Enum.GetNames(typeof(T)));
         public void AddCompletions(in string prefixe, params string[] candidates) => AddCompletions(prefixe, (IEnumerable<string>)candidates);
         public void AddCompletions(in string argument, IEnumerable<string> candidates)
         {

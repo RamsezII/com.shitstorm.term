@@ -11,9 +11,17 @@ namespace _TERM_
             CmdExecution execution = root_namespace.TryParseCommand_term(context);
 
             if (execution == null)
+            {
+                if (reader.type == CmdTypes.Execute)
+                {
+                    var eerror = connection.ESend(new CmdClient.CmdResponse_error($"No execution at the end of command '{reader.read_last}'"));
+                    while (eerror.MoveNext())
+                        yield return 0;
+                }
                 yield break;
+            }
 
-            reader.Error(execution.error.message);
+            reader.Error(execution._error);
 
             if (reader.type != CmdTypes.Execute || reader.HasError || !execution.ready)
                 yield break;
@@ -70,107 +78,114 @@ namespace _TERM_
                     if (!moved)
                         break;
 
-                    if (step.type == CmdStepTypes.Prompt)
+                    switch (step.type)
                     {
-                        var eprompt = connection.ESend(new CmdClient.CmdResponse_prompt(step.text));
-                        while (eprompt.MoveNext())
-                            yield return 0;
-
-                        bool received_input = false;
-
-                        while (!received_input && !cancelled && !failed && !connection.IsClosed)
-                        {
-                            if (!connection.TryDequeue(out CmdClient.CmdRequest request))
+                        case CmdStep.Types.Prompt:
                             {
-                                yield return 0;
-                                continue;
-                            }
-
-                            if (request.error != null)
-                            {
-                                var eerror = connection.ESend(new CmdClient.CmdResponse_error(request.error));
-                                while (eerror.MoveNext())
+                                var eprompt = connection.ESend(new CmdClient.CmdResponse_prompt(step.text));
+                                while (eprompt.MoveNext())
                                     yield return 0;
-                                failed = true;
-                            }
-                            else if (string.Equals(request.type, "input", StringComparison.OrdinalIgnoreCase))
-                            {
-                                context.reader = new(type: CmdTypes.Execute, line: request.cmdline);
-                                received_input = true;
-                            }
-                            else if (string.Equals(request.type, "complete", StringComparison.OrdinalIgnoreCase))
-                            {
-                                CmdReader completion_reader = new(type: CmdTypes.Complete, line: request.cmdline, cursor: request.cursor);
-                                Exception completion_exception = null;
 
-                                try
-                                {
-                                    step.completer?.Invoke(completion_reader);
-                                }
-                                catch (Exception e)
-                                {
-                                    completion_exception = e;
-                                }
+                                bool received_input = false;
 
-                                if (completion_exception == null)
+                                while (!received_input && !cancelled && !failed && !connection.IsClosed)
                                 {
-                                    var ecompletion = connection.ESend(new CmdClient.CmdResponse_completions(completion_reader));
-                                    while (ecompletion.MoveNext())
+                                    if (!connection.TryDequeue(out CmdClient.CmdRequest request))
+                                    {
                                         yield return 0;
-                                }
-                                else
-                                {
-                                    var eexception = connection.ESend(new CmdClient.CmdResponse_exception(completion_exception));
-                                    while (eexception.MoveNext())
-                                        yield return 0;
-                                }
-                            }
-                            else if (string.Equals(request.type, "cancel", StringComparison.OrdinalIgnoreCase))
-                                cancelled = true;
-                            else
-                            {
-                                var eerror = connection.ESend(new CmdClient.CmdResponse_error($"Expected prompt input, completion or cancellation, received '{request.type}'."));
-                                while (eerror.MoveNext())
-                                    yield return 0;
-                                failed = true;
-                            }
-                        }
-                    }
-                    else if (step.type == CmdStepTypes.Status)
-                    {
-                        var estatus = connection.ESend(new CmdClient.CmdResponse_status(step.text, step.progress));
-                        while (estatus.MoveNext())
-                            yield return 0;
-                    }
-                    else if (step.type == CmdStepTypes.Result)
-                    {
-                        routine_result = step.text;
-                        finished = true;
-                    }
-                    else
-                    {
-                        if (connection.TryDequeue(out CmdClient.CmdRequest request))
-                        {
-                            if (request.error != null)
-                            {
-                                var eerror = connection.ESend(new CmdClient.CmdResponse_error(request.error));
-                                while (eerror.MoveNext())
-                                    yield return 0;
-                                failed = true;
-                            }
-                            else if (string.Equals(request.type, "cancel", StringComparison.OrdinalIgnoreCase))
-                                cancelled = true;
-                            else
-                            {
-                                var eerror = connection.ESend(new CmdClient.CmdResponse_error($"Command is not waiting for input; received '{request.type}'."));
-                                while (eerror.MoveNext())
-                                    yield return 0;
-                                failed = true;
-                            }
-                        }
+                                        continue;
+                                    }
 
-                        if (!cancelled && !failed)
-                            yield return 1;
+                                    if (request.error != null)
+                                    {
+                                        var eerror = connection.ESend(new CmdClient.CmdResponse_error(request.error));
+                                        while (eerror.MoveNext())
+                                            yield return 0;
+                                        failed = true;
+                                    }
+                                    else if (string.Equals(request.type, "input", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        context.reader = new(type: CmdTypes.Execute, line: request.cmdline);
+                                        received_input = true;
+                                    }
+                                    else if (string.Equals(request.type, "complete", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        CmdReader completion_reader = new(type: CmdTypes.Complete, line: request.cmdline, cursor: request.cursor);
+                                        Exception completion_exception = null;
+
+                                        try
+                                        {
+                                            step.completer?.Invoke(completion_reader);
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            completion_exception = e;
+                                        }
+
+                                        if (completion_exception == null)
+                                        {
+                                            var ecompletion = connection.ESend(new CmdClient.CmdResponse_completions(completion_reader));
+                                            while (ecompletion.MoveNext())
+                                                yield return 0;
+                                        }
+                                        else
+                                        {
+                                            var eexception = connection.ESend(new CmdClient.CmdResponse_exception(completion_exception));
+                                            while (eexception.MoveNext())
+                                                yield return 0;
+                                        }
+                                    }
+                                    else if (string.Equals(request.type, "cancel", StringComparison.OrdinalIgnoreCase))
+                                        cancelled = true;
+                                    else
+                                    {
+                                        var eerror = connection.ESend(new CmdClient.CmdResponse_error($"Expected prompt input, completion or cancellation, received '{request.type}'."));
+                                        while (eerror.MoveNext())
+                                            yield return 0;
+                                        failed = true;
+                                    }
+                                }
+                            }
+                            break;
+
+                        case CmdStep.Types.Status:
+                            {
+                                var estatus = connection.ESend(new CmdClient.CmdResponse_status(step.text, step.progress));
+                                while (estatus.MoveNext())
+                                    yield return 0;
+                            }
+                            break;
+
+                        case CmdStep.Types.Result:
+                            routine_result = step.text;
+                            finished = true;
+                            break;
+
+                        default:
+                            {
+                                if (connection.TryDequeue(out CmdClient.CmdRequest request))
+                                    if (request.error != null)
+                                    {
+                                        var eerror = connection.ESend(new CmdClient.CmdResponse_error(request.error));
+                                        while (eerror.MoveNext())
+                                            yield return 0;
+                                        failed = true;
+                                    }
+                                    else if (string.Equals(request.type, "cancel", StringComparison.OrdinalIgnoreCase))
+                                        cancelled = true;
+                                    else
+                                    {
+                                        var eerror = connection.ESend(new CmdClient.CmdResponse_error($"Command is not waiting for input; received '{request.type}'."));
+                                        while (eerror.MoveNext())
+                                            yield return 0;
+                                        failed = true;
+                                    }
+
+                                if (!cancelled && !failed)
+                                    yield return 1;
+
+                                break;
+                            }
                     }
                 }
 

@@ -12,8 +12,8 @@ namespace _TERM_.Tests
             {
                 if (context.Reader.TryRead(out string output))
                 {
-                    context.list_args.Add(output);
-                    return (CmdExecution)(static context => (string)context.list_args[0]);
+                    context.queue_args.Enqueue(output);
+                    return new(static context => (string)context.queue_args.Dequeue());
                 }
 
                 context.Reader.Error($"expected argument");
@@ -24,13 +24,13 @@ namespace _TERM_.Tests
             {
                 if (!context.Reader.TryRead(out string output) || !float.TryParse(output, out float seconds))
                     seconds = 0;
-                context.list_args.Add(seconds);
+                context.queue_args.Enqueue(seconds);
 
-                return (CmdExecution)EWait;
-                static IEnumerator<CmdStep> EWait(CmdContext context)
+                return new(ERoutine);
+                static IEnumerator<CmdStep> ERoutine(CmdContext context)
                 {
                     float timer = 0;
-                    float seconds = (float)context.list_args[0];
+                    float seconds = (float)context.queue_args.Dequeue();
                     while (timer < seconds)
                     {
                         timer += Time.unscaledDeltaTime;
@@ -41,8 +41,8 @@ namespace _TERM_.Tests
 
             TermServer.root_namespace.AddCommand("wait_1second", static context =>
             {
-                return (CmdExecution)EWait;
-                static IEnumerator<CmdStep> EWait(CmdContext context)
+                return new(ERoutine);
+                static IEnumerator<CmdStep> ERoutine(CmdContext context)
                 {
                     float timer = 0;
                     while (timer < 1)
@@ -55,8 +55,8 @@ namespace _TERM_.Tests
 
             TermServer.root_namespace.AddCommand("prompt_test", static context =>
             {
-                return (CmdExecution)EPromptTest;
-                static IEnumerator<CmdStep> EPromptTest(CmdContext context)
+                return new(ERoutine);
+                static IEnumerator<CmdStep> ERoutine(CmdContext context)
                 {
                     yield return CmdStep.Prompt("name: ", static reader =>
                     {
@@ -92,8 +92,8 @@ namespace _TERM_.Tests
                 execution: static context =>
                 {
                     context.Reader.TryRead(out string output);
-                    context.list_args.Add(output);
-                    return (CmdExecution)(static context => (string)context.list_args[0]);
+                    context.queue_args.Enqueue(output);
+                    return new(static context => (string)context.queue_args.Dequeue());
                 }
             );
         }
