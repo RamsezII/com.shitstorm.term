@@ -118,7 +118,8 @@ namespace _TERM_
 
         TerminalInstance StartTerminal(string executable, string title)
         {
-            string clientArguments = $"--host 127.0.0.1 --command-port {port_cmd} --log-port {port_log} --title {QuoteArgument(title)}";
+            string historyFile = Path.Combine(ArkMachine.DFHome.FullName, typeof(TermServer).FullName + ".history.txt");
+            string clientArguments = $"--host 127.0.0.1 --command-port {port_cmd} --log-port {port_log} --title {QuoteArgument(title)} --history-file {QuoteArgument(historyFile)}";
 
             try
             {
@@ -131,7 +132,7 @@ namespace _TERM_
 
                     case RuntimePlatform.LinuxEditor:
                     case RuntimePlatform.LinuxPlayer:
-                        int linuxProcessId = StartLinuxTerminal(executable, title);
+                        int linuxProcessId = StartLinuxTerminal(executable, title, historyFile);
                         return linuxProcessId <= 0 ? null : new TerminalInstance(title, linuxProcessId: linuxProcessId);
 
                     default:
@@ -184,7 +185,7 @@ namespace _TERM_
             }
         }
 
-        int StartLinuxTerminal(string executable, string title)
+        int StartLinuxTerminal(string executable, string title, string historyFile)
         {
             string workingDirectory = Path.GetDirectoryName(executable);
             string[] clientArguments =
@@ -198,6 +199,8 @@ namespace _TERM_
                 port_log.ToString(),
                 "--title",
                 title,
+                "--history-file",
+                historyFile,
             };
 
             if (File.Exists(XdgTerminalExec))
