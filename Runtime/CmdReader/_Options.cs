@@ -9,7 +9,7 @@ namespace _TERM_
         public class OptionsInput
         {
             internal readonly Dictionary<char, CmdOption> short_options = new();
-            internal readonly Dictionary<string, CmdOption> long_options = new();
+            internal readonly Dictionary<string, CmdOption> long_options = new(StringComparer.OrdinalIgnoreCase);
 
             //----------------------------------------------------------------------------------------------------------
 
@@ -110,6 +110,11 @@ namespace _TERM_
                                 ++count;
                                 if (IsOnCompletion())
                                     return count;
+                            }
+                            else
+                            {
+                                Error($"unexpected option '{c}'");
+                                return count;
                             }
                     }
                 }
