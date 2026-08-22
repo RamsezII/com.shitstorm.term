@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
+using static _TERM_.CmdReader.OptionsInput;
 
 namespace _TERM_.Tests
 {
@@ -17,6 +19,33 @@ namespace _TERM_.Tests
                 }
 
                 context.Reader.Error($"expected argument");
+                return null;
+            });
+
+            TermServer.root_namespace.AddCommand("test_options", static context =>
+            {
+                if (CmdReader.TryReadOptions(
+                    context: context,
+                    input: new(
+                        "non-interactive",
+                        ('f', "force"),
+                        ("Path", reader =>
+                        {
+                            reader.TryRead(out string path);
+                            if (reader.IsOnCompletion())
+                                reader.AddCompletions(path, "path1/path2/path3", "chemin1/chemin2");
+                            return path;
+                        }
+                )
+                )
+                    ) > 0)
+                    return new(function: static context =>
+                    {
+                        StringBuilder sb = new();
+                        foreach (var pair in context.dict_options)
+                            sb.AppendLine($"{pair.Key}: '{pair.Value}'");
+                        return sb.TroncatedForLog();
+                    });
                 return null;
             });
 

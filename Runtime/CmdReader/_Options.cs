@@ -1,0 +1,115 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace _TERM_
+{
+    partial class CmdReader
+    {
+        public class OptionsInput
+        {
+            internal readonly Dictionary<char, CmdOption> short_options = new();
+            internal readonly Dictionary<string, CmdOption> long_options = new();
+
+            //----------------------------------------------------------------------------------------------------------
+
+            public OptionsInput(params CmdOption[] options)
+            {
+                foreach (var option in options)
+                {
+                    if (option.short_name != 0)
+                        short_options.Add(option.short_name, option);
+                    long_options.Add(option.long_name, option);
+                }
+            }
+        }
+
+        //----------------------------------------------------------------------------------------------------------
+
+        /// <returns>true if no error</returns>
+        public static int TryReadOptions(in CmdContext context, in OptionsInput input) => context.reader.TryReadOptions(context.dict_options, input);
+
+        public int TryReadOptions(Dictionary<CmdOption, object> output, in OptionsInput input)
+        {
+            output.Clear();
+
+            int count = 0;
+            bool read_b = true;
+
+            do
+            {
+                SkipEmpties(true);
+                int read_i = this.read_i;
+                read_b = TryRead(ref read_i, out string read);
+
+                if (!read_b || read.Length == 0 || read[0] == '-')
+                    if (IsOnCompletion())
+                        AddCompletions(read, input.long_options.Keys.Where(long_name => !output.ContainsKey(long_name)).Select(long_name => $"--{long_name}"));
+
+                if (read == null || read.Length <= 1)
+                    return count;
+
+                if (read.Length > 0 && read[0] == '-')
+                {
+                    if (output.Count == input.long_options.Count)
+                    {
+                        Error($"Did not expect anymore options");
+                        return count;
+                    }
+
+                    // --
+                    if (read.Length > 1 && read[1] == '-')
+                    {
+                        string long_name = read[2..];
+                        if (input.long_options.TryGetValue(long_name, out var option))
+                        {
+                            if (output.ContainsKey(option))
+                            {
+                                Error($"Option '{long_name}' already present");
+                                return count;
+                            }
+                            this.read_i = read_i;
+                            compl_candidates.Clear();
+                            output.Add(option, option.function?.Invoke(this));
+                            ++count;
+                        }
+                        else
+                        {
+                            Error($"Did not expect option '{long_name}'");
+                            return count;
+                        }
+                    }
+                    // -
+                    else
+                    {
+                        string flags = read[1..];
+                        HashSet<char> chars = new(flags);
+                        if (flags.Length != chars.Count)
+                        {
+                            Error($"Duplicate flags in '{flags}'");
+                            return count;
+                        }
+
+                        this.read_i = read_i;
+                        compl_candidates.Clear();
+
+                        foreach (char c in chars)
+                            if (input.short_options.TryGetValue(c, out var option))
+                            {
+                                if (output.ContainsKey(option))
+                                {
+                                    Error($"Option '{c}' already present");
+                                    return count;
+                                }
+                                output.Add(option, option.function?.Invoke(this));
+                                ++count;
+                            }
+                    }
+                }
+            }
+            while (read_b);
+
+            return count;
+        }
+    }
+}
