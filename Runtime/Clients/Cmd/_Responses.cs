@@ -70,6 +70,7 @@ namespace _TERM_
         {
             public int start;
             public IList<string> candidates;
+            public string error;
 
             //----------------------------------------------------------------------------------------------------------
 
@@ -77,6 +78,12 @@ namespace _TERM_
             {
                 start = reader.compl_start;
                 candidates = reader.compl_candidates;
+
+                // Parsing errors are often provisional while the user is typing
+                // (for example "--Pa" while "--Path" is a valid candidate).
+                // Report one only when completion found nothing useful to offer.
+                if (candidates.Count == 0)
+                    error = reader.GetError;
             }
         }
 
