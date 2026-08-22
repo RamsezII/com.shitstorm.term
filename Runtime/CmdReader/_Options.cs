@@ -100,7 +100,9 @@ namespace _TERM_
 
                         // Validate the complete group before invoking callbacks so
                         // "-fz" cannot apply "f" before discovering an unknown "z".
-                        foreach (char c in flags)
+                        for (int flag_i = 0; flag_i < flags.Length; ++flag_i)
+                        {
+                            char c = flags[flag_i];
                             if (!input.short_options.TryGetValue(c, out var option))
                             {
                                 Error($"unexpected option '{c}'");
@@ -111,25 +113,25 @@ namespace _TERM_
                                 Error($"Option '{c}' already present");
                                 return count;
                             }
+                            else if (option.function != null && flag_i < flags.Length - 1)
+                            {
+                                // Once a callback starts reading, the following token belongs
+                                // to that option. Requiring it to be last keeps grouped flags
+                                // deterministic: "-fp value" is valid, "-pf value" is not.
+                                Error($"Option '{c}' must be the last flag in '{read}' because it reads a value");
+                                return count;
+                            }
+                        }
 
                         foreach (char c in flags)
                         {
                             var option = input.short_options[c];
-                            int value_start_i = start_i;
-                            int value_read_i = this.read_i;
-
                             output.Add(option, option.function?.Invoke(this));
                             ++count;
-
-                            // Staying on "-fp" must not stop after "f". Stop only
-                            // when this option moved the reader onto its own value.
-                            bool moved_to_value = start_i != value_start_i || this.read_i != value_read_i;
-                            if (moved_to_value && IsOnCompletion())
-                                return count;
                         }
 
-                        // The whole group is now registered. Without this return,
-                        // the next loop would treat the end of "-fp" as a new token.
+                        // The whole group, and the last flag's value if it has one,
+                        // are now registered. Do not reinterpret the cursor as a new option.
                         if (IsOnCompletion())
                             return count;
                     }

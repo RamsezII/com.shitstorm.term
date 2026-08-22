@@ -6,6 +6,11 @@ namespace _TERM_
     {
         public readonly char short_name;
         public readonly string long_name;
+
+        /// <summary>
+        /// Reads and returns this option's value and may register its completion candidates.
+        /// It runs for both completion and execution requests, so it must not perform gameplay side effects.
+        /// </summary>
         public readonly Func<CmdReader, object> function;
 
         //----------------------------------------------------------------------------------------------------------

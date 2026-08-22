@@ -31,13 +31,17 @@
         public bool TryRead(ref int read_i, out string output)
         {
             SkipEmpties(ref read_i);
+            int token_start_i = read_i;
 
             if (read_i < cursor)
             {
                 SkipNoneEmpties(ref read_i);
-                if (read_i > start_i)
+                if (read_i > token_start_i)
                 {
-                    read_last = output = line[start_i..read_i];
+                    // This overload is also used for look-ahead with a copied index.
+                    // Its token bounds must therefore not depend on the reader's
+                    // current global completion scope.
+                    read_last = output = line[token_start_i..read_i];
                     return true;
                 }
             }
