@@ -43,8 +43,11 @@ namespace _TERM_
                 read_b = TryRead(ref read_i, out string read);
 
                 if (!read_b || read.Length == 0 || read[0] == '-')
+                {
+                    this.read_i = read_i;
                     if (IsOnCompletion())
                         AddCompletions(read, input.long_options.Keys.Where(long_name => !output.ContainsKey(long_name)).Select(long_name => $"--{long_name}"));
+                }
 
                 if (read == null || read.Length <= 1)
                     return count;
@@ -72,6 +75,8 @@ namespace _TERM_
                             compl_candidates.Clear();
                             output.Add(option, option.function?.Invoke(this));
                             ++count;
+                            if (IsOnCompletion())
+                                return count;
                         }
                         else
                         {
@@ -93,7 +98,7 @@ namespace _TERM_
                         this.read_i = read_i;
                         compl_candidates.Clear();
 
-                        foreach (char c in chars)
+                        foreach (char c in flags)
                             if (input.short_options.TryGetValue(c, out var option))
                             {
                                 if (output.ContainsKey(option))
@@ -103,9 +108,13 @@ namespace _TERM_
                                 }
                                 output.Add(option, option.function?.Invoke(this));
                                 ++count;
+                                if (IsOnCompletion())
+                                    return count;
                             }
                     }
                 }
+                else
+                    return count;
             }
             while (read_b);
 

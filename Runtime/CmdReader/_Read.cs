@@ -2,16 +2,11 @@
 {
     partial class CmdReader
     {
-        internal void MoveStart()
-        {
-            start_i = read_i;
-        }
-
         public void SkipEmpties(in bool move_start)
         {
             SkipEmpties(ref read_i);
             if (move_start)
-                MoveStart();
+                start_i = read_i;
         }
 
         public void SkipEmpties(ref int read_i)
