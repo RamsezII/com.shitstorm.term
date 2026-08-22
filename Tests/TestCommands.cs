@@ -29,7 +29,7 @@ namespace _TERM_.Tests
                     input: new(
                         "non-interactive",
                         ('f', "force"),
-                        ("Path", reader =>
+                        ('p', "Path", reader =>
                         {
                             reader.TryRead(out string path);
                             if (reader.IsOnCompletion())

@@ -72,7 +72,7 @@ namespace _TERM_
                                 return count;
                             }
                             this.read_i = read_i;
-                            compl_candidates.Clear();
+                            ClearCompletions();
                             output.Add(option, option.function?.Invoke(this));
                             ++count;
                             if (IsOnCompletion())
@@ -96,26 +96,42 @@ namespace _TERM_
                         }
 
                         this.read_i = read_i;
-                        compl_candidates.Clear();
+                        ClearCompletions();
 
+                        // Validate the complete group before invoking callbacks so
+                        // "-fz" cannot apply "f" before discovering an unknown "z".
                         foreach (char c in flags)
-                            if (input.short_options.TryGetValue(c, out var option))
-                            {
-                                if (output.ContainsKey(option))
-                                {
-                                    Error($"Option '{c}' already present");
-                                    return count;
-                                }
-                                output.Add(option, option.function?.Invoke(this));
-                                ++count;
-                                if (IsOnCompletion())
-                                    return count;
-                            }
-                            else
+                            if (!input.short_options.TryGetValue(c, out var option))
                             {
                                 Error($"unexpected option '{c}'");
                                 return count;
                             }
+                            else if (output.ContainsKey(option))
+                            {
+                                Error($"Option '{c}' already present");
+                                return count;
+                            }
+
+                        foreach (char c in flags)
+                        {
+                            var option = input.short_options[c];
+                            int value_start_i = start_i;
+                            int value_read_i = this.read_i;
+
+                            output.Add(option, option.function?.Invoke(this));
+                            ++count;
+
+                            // Staying on "-fp" must not stop after "f". Stop only
+                            // when this option moved the reader onto its own value.
+                            bool moved_to_value = start_i != value_start_i || this.read_i != value_read_i;
+                            if (moved_to_value && IsOnCompletion())
+                                return count;
+                        }
+
+                        // The whole group is now registered. Without this return,
+                        // the next loop would treat the end of "-fp" as a new token.
+                        if (IsOnCompletion())
+                            return count;
                     }
                 }
                 else
