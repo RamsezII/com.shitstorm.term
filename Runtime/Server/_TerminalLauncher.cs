@@ -36,7 +36,7 @@ namespace _TERM_
         {
 #if ENABLE_LEGACY_INPUT_MANAGER
             if (Input.GetKeyDown(terminal_key))
-                if (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt) || UsageManager.AllAreEmpty(UsageGroups.Typing))
+                if (Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt) || !NUCLEOR.instance.isTyping._value && UsageManager.AllAreEmpty(UsageGroups.Typing))
                     OpenTerminal(forceNew: Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
 #endif
         }
