@@ -15,7 +15,7 @@ namespace _TERM_
         internal readonly CmdTypes type;
         public readonly string line;
         public readonly int cursor;
-        int start_i, read_i;
+        [SerializeField] internal int start_i, read_i;
         internal string read_last;
         readonly StringBuilder error_sb;
         public bool HasError => error_sb.Length > 0;

@@ -71,6 +71,7 @@ namespace _TERM_
                     {
                         exception = e;
                         running = false;
+                        Debug.LogException(e);
                     }
 
                     if (exception != null)

@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
-using static _TERM_.CmdReader.OptionsInput;
 
 namespace _TERM_.Tests
 {
@@ -14,8 +13,8 @@ namespace _TERM_.Tests
             {
                 if (context.Reader.TryRead(out string output))
                 {
-                    context.queue_args.Enqueue(output);
-                    return new(static context => (string)context.queue_args.Dequeue());
+                    context.EnqueueArg(output);
+                    return new(static context => context.DequeueArg<string>());
                 }
 
                 context.Reader.Error($"expected argument");
@@ -24,8 +23,7 @@ namespace _TERM_.Tests
 
             TermServer.root_namespace.AddCommand("test_options", static context =>
             {
-                if (CmdReader.TryReadOptions(
-                    context: context,
+                if (context.TryReadOptions(
                     input: new(
                         "non-interactive",
                         ('f', "force"),
@@ -53,13 +51,13 @@ namespace _TERM_.Tests
             {
                 if (!context.Reader.TryRead(out string output) || !float.TryParse(output, out float seconds))
                     seconds = 0;
-                context.queue_args.Enqueue(seconds);
+                context.EnqueueArg(seconds);
 
                 return new(ERoutine);
                 static IEnumerator<CmdStep> ERoutine(CmdContext context)
                 {
                     float timer = 0;
-                    float seconds = (float)context.queue_args.Dequeue();
+                    float seconds = context.DequeueArg<float>();
                     while (timer < seconds)
                     {
                         timer += Time.unscaledDeltaTime;
@@ -121,8 +119,8 @@ namespace _TERM_.Tests
                 execution: static context =>
                 {
                     context.Reader.TryRead(out string output);
-                    context.queue_args.Enqueue(output);
-                    return new(static context => (string)context.queue_args.Dequeue());
+                    context.EnqueueArg(output);
+                    return new(static context => context.DequeueArg<string>());
                 }
             );
         }

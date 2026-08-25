@@ -25,15 +25,6 @@ namespace _TERM_
                             compl_candidates.Add(candidate);
         }
 
-        public void ReplaceCompletions(in string argument, IEnumerable<string> candidates)
-        {
-            if (candidates == null || !IsOnCompletion())
-                return;
-
-            ClearCompletions();
-            AddCompletions(argument, candidates);
-        }
-
         internal void ClearCompletions()
         {
             compl_candidates.Clear();

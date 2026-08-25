@@ -2,21 +2,21 @@
 {
     partial class CmdReader
     {
-        public void SkipEmpties(in bool move_start)
+        internal void SkipEmpties(in bool move_start)
         {
             SkipEmpties(ref read_i);
             if (move_start)
                 start_i = read_i;
         }
 
-        public void SkipEmpties(ref int read_i)
+        internal void SkipEmpties(ref int read_i)
         {
             while (read_i < line.Length && line[read_i] == ' ')
                 ++read_i;
         }
 
         public void SkipNoneEmpties() => SkipNoneEmpties(ref read_i);
-        public void SkipNoneEmpties(ref int read_i)
+        internal void SkipNoneEmpties(ref int read_i)
         {
             while (read_i < line.Length && line[read_i] != ' ')
                 ++read_i;
@@ -28,7 +28,7 @@
             return TryRead(ref read_i, out output);
         }
 
-        public bool TryRead(ref int read_i, out string output)
+        internal bool TryRead(ref int read_i, out string output)
         {
             SkipEmpties(ref read_i);
             int token_start_i = read_i;

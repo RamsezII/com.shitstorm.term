@@ -3,6 +3,11 @@ using System.Collections.Generic;
 
 namespace _TERM_
 {
+    public interface ITermUser
+    {
+        CmdExecution OnTryCommand(in string arg0, in CmdContext context);
+    }
+
     public abstract class CmdNode
     {
         internal abstract CmdExecution TryParseCommand_term(in CmdContext context);
@@ -10,12 +15,7 @@ namespace _TERM_
 
     public sealed class CmdNamespace : CmdNode
     {
-        public interface IUser
-        {
-            CmdExecution OnTryCommand(in string arg0, in CmdContext context);
-        }
-
-        public readonly HashSet<IUser> users = new();
+        public readonly HashSet<ITermUser> users = new();
         public readonly Dictionary<string, CmdNode> tree = new(StringComparer.OrdinalIgnoreCase);
 
         //----------------------------------------------------------------------------------------------------------

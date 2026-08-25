@@ -11,6 +11,7 @@ namespace _TERM_
         internal readonly string _error;
         internal readonly bool ready;
         public static CmdExecution CodeNotImplemented(in object code) => new($"{code.GetType()} '{code}' not implemented");
+        public static CmdExecution CouldNotParseCode(in object code) => new($"Cound not parse {code.GetType()} '{code}'");
 
         //----------------------------------------------------------------------------------------------------------
 

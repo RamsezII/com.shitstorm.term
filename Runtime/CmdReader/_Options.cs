@@ -26,10 +26,7 @@ namespace _TERM_
 
         //----------------------------------------------------------------------------------------------------------
 
-        /// <returns>true if no error</returns>
-        public static int TryReadOptions(in CmdContext context, in OptionsInput input) => context.reader.TryReadOptions(context.dict_options, input);
-
-        public int TryReadOptions(Dictionary<CmdOption, object> output, in OptionsInput input)
+        internal int TryReadOptions(Dictionary<CmdOption, object> output, in OptionsInput input)
         {
             output.Clear();
 

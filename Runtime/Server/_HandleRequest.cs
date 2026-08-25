@@ -14,7 +14,7 @@ namespace _TERM_
             {
                 if (reader.type == CmdTypes.Execute)
                 {
-                    var eerror = connection.ESend(new CmdClient.CmdResponse_error($"No execution at the end of command '{reader.read_last}'"));
+                    var eerror = connection.ESend(new CmdClient.CmdResponse_error($"No code for command '{reader.line[..reader.read_i]}'"));
                     while (eerror.MoveNext())
                         yield return 0;
                 }
