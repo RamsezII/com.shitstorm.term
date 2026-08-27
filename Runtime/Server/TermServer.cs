@@ -52,7 +52,7 @@ namespace _TERM_
             LoadRSettings();
             LoadHSettings();
             StartServer();
-#if HAS_SGUI
+#if HAS_SGUI && HAS_TMPro
             InitSguiRuntimeSettings();
 #endif
             NUCLEOR.delegates.OnApplicationFocus += () => LoadHSettings(log: false);
