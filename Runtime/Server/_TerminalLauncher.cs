@@ -111,14 +111,14 @@ namespace _TERM_
                     : Path.Combine(Application.dataPath, "_TERM_", "Editor", "Binaries", platformDirectory, executableName);
             }
 #endif
-            return Path.Combine(ArkMachine.DFTools.FullName, executableName);
+            return Path.Combine(NUCLEOR.DFTools.FullName, executableName);
         }
 
         //----------------------------------------------------------------------------------------------------------
 
         TerminalInstance StartTerminal(string executable, string title)
         {
-            string historyFile = Path.Combine(ArkMachine.DFHome.FullName, typeof(TermServer).FullName + ".history.txt");
+            string historyFile = Path.Combine(NUCLEOR.DFHome.FullName, typeof(TermServer).FullName + ".history.txt");
             string clientArguments = $"--host 127.0.0.1 --command-port {port_cmd} --log-port {port_log} --title {QuoteArgument(title)} --history-file {QuoteArgument(historyFile)}";
 
             try

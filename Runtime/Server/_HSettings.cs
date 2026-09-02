@@ -7,7 +7,7 @@ namespace _TERM_
 {
     partial class TermServer
     {
-        static string GetHSettingsPath() => Path.Combine(ArkMachine.DFHome.FullName, typeof(TermServer).GetJSonFileName());
+        static string GetHSettingsPath() => Path.Combine(NUCLEOR.DFHome.FullName, typeof(TermServer).GetJSonFileName());
 
         //----------------------------------------------------------------------------------------------------------
 

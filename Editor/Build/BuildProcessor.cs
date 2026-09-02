@@ -36,7 +36,7 @@ namespace _TERM_.Editor
 
             string buildRoot = Path.GetDirectoryName(builtPlayerPath) ?? throw new BuildFailedException($"Chemin de build invalide : {builtPlayerPath}");
 
-            string toolsDirectory = Path.Combine(buildRoot, ArkMachine.dname_tools);
+            string toolsDirectory = Path.Combine(buildRoot, NUCLEOR.dname_tools);
             Directory.CreateDirectory(toolsDirectory);
 
             string destination = Path.Combine(toolsDirectory, executableName);
